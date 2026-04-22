@@ -5,6 +5,10 @@ export type PlanInputs = {
   startDebt: number;
   monthlySpending: number;
   annualIncome: number;
+  rentalIncome: number;
+  rentalIncomeRate: number;
+  windfallAmount: number;
+  windfallYear: number;
   nominalReturn: number;
   horizonYears: number;
   cashBalance: number;
@@ -29,6 +33,10 @@ export const DEFAULT_PLAN_INPUTS: PlanInputs = {
   startDebt: 50_000,
   monthlySpending: 5_000,
   annualIncome: 120_000,
+  rentalIncome: 0,
+  rentalIncomeRate: 0.02,
+  windfallAmount: 0,
+  windfallYear: new Date().getFullYear() + 10,
   nominalReturn: 0.06,
   horizonYears: 30,
   cashBalance: 20_000,

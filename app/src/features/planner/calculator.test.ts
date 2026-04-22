@@ -21,6 +21,10 @@ const BASE_INPUTS: PlanInputs = {
   startDebt: 0,
   monthlySpending: 1_000,
   annualIncome: 50_000,
+  rentalIncome: 0,
+  rentalIncomeRate: 0,
+  windfallAmount: 0,
+  windfallYear: 0,
   nominalReturn: 0.05,
   horizonYears: 30,
   cashBalance: 0,
@@ -349,6 +353,195 @@ describe("projectNetWorth", () => {
     for (let i = 0; i < withDebt.length; i += 1) {
       money(withoutDebt[i].netWorth - withDebt[i].netWorth, 75_000);
     }
+  });
+
+  it("adds rental income to the netFlow at year 1", () => {
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0,
+        rentalIncome: 20_000,
+        rentalIncomeRate: 0
+      },
+      FIXED_NOW
+    );
+    // Year 0: assets 0, no NW. Year 1: rental 20k compounds (rate 0) → 20k added to assets.
+    expect(points[0].netWorth).toBe(0);
+    money(points[1].netWorth, 20_000);
+    money(points[2].netWorth, 40_000);
+  });
+
+  it("grows rental income at its own rate each subsequent year", () => {
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0,
+        rentalIncome: 10_000,
+        rentalIncomeRate: 0.1
+      },
+      FIXED_NOW
+    );
+    // Year 1: rental grows once to 11k → assets 11k.
+    // Year 2: rental grows to 12.1k → assets 11k + 12.1k = 23.1k.
+    // Year 3: rental 13.31k → assets 36.41k.
+    money(points[1].netWorth, 11_000);
+    money(points[2].netWorth, 23_100);
+    money(points[3].netWorth, 36_410);
+  });
+
+  it("keeps rental income flat when its rate is zero", () => {
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0,
+        rentalIncome: 5_000,
+        rentalIncomeRate: 0
+      },
+      FIXED_NOW
+    );
+    for (let i = 1; i <= 5; i += 1) money(points[i].netWorth, 5_000 * i);
+  });
+
+  it("deposits the windfall into the investment portfolio on the matching calendar year", () => {
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        cashBalance: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0,
+        windfallAmount: 100_000,
+        windfallYear: FIXED_NOW.getFullYear() + 3
+      },
+      FIXED_NOW
+    );
+    // Years 0..2: nothing happens.
+    for (let i = 0; i <= 2; i += 1) expect(points[i].netWorth).toBe(0);
+    // Year 3: windfall lands. Year 4+: stays in assets (no return, no flows).
+    expect(points[3].netWorth).toBe(100_000);
+    expect(points[4].netWorth).toBe(100_000);
+  });
+
+  it("compounds the windfall with the nominal return from the following year onward", () => {
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        cashBalance: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0.1,
+        windfallAmount: 100_000,
+        windfallYear: FIXED_NOW.getFullYear() + 2
+      },
+      FIXED_NOW
+    );
+    // Year 2: windfall lands at year-end → 100k.
+    // Year 3: 100k * 1.1 = 110k. Year 4: 121k.
+    money(points[2].netWorth, 100_000);
+    money(points[3].netWorth, 110_000);
+    money(points[4].netWorth, 121_000);
+  });
+
+  it("ignores a windfall year outside the projection horizon", () => {
+    const before = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        horizonYears: MIN_HORIZON_YEARS,
+        windfallAmount: 100_000,
+        windfallYear: FIXED_NOW.getFullYear() - 5
+      },
+      FIXED_NOW
+    );
+    const after = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        horizonYears: MIN_HORIZON_YEARS,
+        windfallAmount: 100_000,
+        windfallYear: FIXED_NOW.getFullYear() + MIN_HORIZON_YEARS + 5
+      },
+      FIXED_NOW
+    );
+    const neutral = projectNetWorth(
+      { ...BASE_INPUTS, horizonYears: MIN_HORIZON_YEARS },
+      FIXED_NOW
+    );
+    for (let i = 0; i < neutral.length; i += 1) {
+      money(before[i].netWorth, neutral[i].netWorth);
+      money(after[i].netWorth, neutral[i].netWorth);
+    }
+  });
+
+  it("treats a zero-amount windfall as a no-op", () => {
+    const withZero = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        windfallAmount: 0,
+        windfallYear: FIXED_NOW.getFullYear() + 5
+      },
+      FIXED_NOW
+    );
+    const without = projectNetWorth(BASE_INPUTS, FIXED_NOW);
+    for (let i = 0; i < without.length; i += 1) {
+      money(withZero[i].netWorth, without[i].netWorth);
+    }
+  });
+
+  it("lands the windfall in assets, not cash (cash unchanged for the windfall year)", () => {
+    // Set up so netFlow = 0 every year (salary matches spending, no rental). Then
+    // cashBalance is untouched by the flows; if the windfall ever went to cash it
+    // would raise NW starting at the windfall year by less than the full amount
+    // (since cash has no return). Here we use nominalReturn = 0 and a cash
+    // starting balance so we can assert cash stays exactly at its start value
+    // for every projection year.
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        cashBalance: 50_000,
+        annualIncome: 12_000,
+        monthlySpending: 1_000,
+        nominalReturn: 0,
+        windfallAmount: 25_000,
+        windfallYear: FIXED_NOW.getFullYear() + 4
+      },
+      FIXED_NOW
+    );
+    // Year 0..3: only cash (50k), assets 0.
+    for (let i = 0; i <= 3; i += 1) expect(points[i].netWorth).toBe(50_000);
+    // Year 4: windfall lands in assets. Cash still 50k, assets now 25k.
+    expect(points[4].netWorth).toBe(75_000);
+    // Year 5: no return, no flow change → stays at 75k.
+    expect(points[5].netWorth).toBe(75_000);
+  });
+
+  it("excludes rental income from direct net-worth contribution", () => {
+    // Rental income only flows through assets via the netFlow equation. If it
+    // were added directly, year 0 NW would already reflect it (spoiler: it
+    // shouldn't).
+    const points = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        startAssets: 0,
+        annualIncome: 0,
+        monthlySpending: 0,
+        nominalReturn: 0,
+        rentalIncome: 50_000,
+        rentalIncomeRate: 0
+      },
+      FIXED_NOW
+    );
+    expect(points[0].netWorth).toBe(0);
   });
 
   it("matches hand-computed values across all buckets for 2 years", () => {

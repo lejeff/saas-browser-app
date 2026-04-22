@@ -20,7 +20,8 @@ type SliderKey =
   | "nominalReturn"
   | "horizonYears"
   | "primaryResidenceRate"
-  | "otherPropertyRate";
+  | "otherPropertyRate"
+  | "rentalIncomeRate";
 
 type SliderSpec = {
   key: SliderKey;
@@ -34,35 +35,41 @@ type SliderSpec = {
 const percent = (v: number) => `${(v * 100).toFixed(1)}%`;
 const years = (v: number) => `${v} year${v === 1 ? "" : "s"}`;
 
-const FINANCIAL_SLIDERS: SliderSpec[] = [
-  {
-    key: "nominalReturn",
-    label: "Nominal return on financial assets",
-    min: -0.05,
-    max: 0.15,
-    step: 0.005,
-    format: percent
-  }
-];
+const NOMINAL_RETURN_SLIDER: SliderSpec = {
+  key: "nominalReturn",
+  label: "Expected annual return",
+  min: -0.05,
+  max: 0.15,
+  step: 0.005,
+  format: percent
+};
 
-const REAL_ESTATE_SLIDERS: SliderSpec[] = [
-  {
-    key: "primaryResidenceRate",
-    label: "Primary residence appreciation",
-    min: MIN_APPRECIATION,
-    max: MAX_APPRECIATION,
-    step: 0.005,
-    format: percent
-  },
-  {
-    key: "otherPropertyRate",
-    label: "Other property appreciation",
-    min: MIN_APPRECIATION,
-    max: MAX_APPRECIATION,
-    step: 0.005,
-    format: percent
-  }
-];
+const RENTAL_INCOME_RATE_SLIDER: SliderSpec = {
+  key: "rentalIncomeRate",
+  label: "Rental income annual appreciation",
+  min: MIN_APPRECIATION,
+  max: MAX_APPRECIATION,
+  step: 0.005,
+  format: percent
+};
+
+const PRIMARY_RESIDENCE_RATE_SLIDER: SliderSpec = {
+  key: "primaryResidenceRate",
+  label: "Annual appreciation rate",
+  min: MIN_APPRECIATION,
+  max: MAX_APPRECIATION,
+  step: 0.005,
+  format: percent
+};
+
+const OTHER_PROPERTY_RATE_SLIDER: SliderSpec = {
+  key: "otherPropertyRate",
+  label: "Annual appreciation rate",
+  min: MIN_APPRECIATION,
+  max: MAX_APPRECIATION,
+  step: 0.005,
+  format: percent
+};
 
 const HORIZON_SLIDER: SliderSpec = {
   key: "horizonYears",
@@ -78,6 +85,8 @@ type AmountKey =
   | "startDebt"
   | "monthlySpending"
   | "annualIncome"
+  | "rentalIncome"
+  | "windfallAmount"
   | "cashBalance"
   | "nonLiquidInvestments"
   | "otherFixedAssets"
@@ -91,49 +100,68 @@ type AmountSpec = {
   max: number;
 };
 
-const FINANCIAL_AMOUNTS: AmountSpec[] = [
-  { key: "startAssets", label: "Starting financial assets", min: 0, max: 100_000_000 },
-  { key: "cashBalance", label: "Cash balance", min: 0, max: 50_000_000 },
-  {
-    key: "nonLiquidInvestments",
-    label: "Non-liquid investments / Private equity",
-    min: 0,
-    max: 100_000_000
-  },
-  { key: "otherFixedAssets", label: "Other fixed assets", min: 0, max: 100_000_000 },
-  { key: "startDebt", label: "Starting total debt", min: 0, max: 50_000_000 },
-  { key: "monthlySpending", label: "Monthly spending", min: 0, max: 1_000_000 },
-  { key: "annualIncome", label: "Annual non-rental income", min: 0, max: 10_000_000 }
+const LIQUID_AMOUNTS: AmountSpec[] = [
+  { key: "startAssets", label: "Financial Assets / Portfolio", min: 0, max: 100_000_000 },
+  { key: "cashBalance", label: "Cash Balance", min: 0, max: 50_000_000 }
+];
+
+const NON_LIQUID_AMOUNTS: AmountSpec[] = [
+  { key: "nonLiquidInvestments", label: "Private Equity", min: 0, max: 100_000_000 },
+  { key: "otherFixedAssets", label: "Other Fixed Assets", min: 0, max: 100_000_000 }
+];
+
+const DEBT_AMOUNTS: AmountSpec[] = [
+  { key: "startDebt", label: "Debt", min: 0, max: 50_000_000 }
+];
+
+const INCOME_EXPENSE_AMOUNTS: AmountSpec[] = [
+  { key: "annualIncome", label: "Salary", min: 0, max: 10_000_000 }
 ];
 
 const REAL_ESTATE_AMOUNTS: AmountSpec[] = [
-  { key: "primaryResidenceValue", label: "Primary residence value", min: 0, max: 100_000_000 },
-  { key: "otherPropertyValue", label: "Other property value", min: 0, max: 100_000_000 }
+  { key: "primaryResidenceValue", label: "Primary Residence value", min: 0, max: 100_000_000 },
+  { key: "otherPropertyValue", label: "Other Property value", min: 0, max: 100_000_000 }
 ];
+
+const WINDFALL_YEAR_MIN = 1900;
+const WINDFALL_YEAR_MAX = 2200;
 
 export function PlannerForm({ value, onChange, onReset }: Props) {
   const update = <K extends keyof PlanInputs>(key: K, next: PlanInputs[K]) => {
     onChange({ ...value, [key]: next });
   };
 
+  const renderAmounts = (specs: AmountSpec[]) => (
+    <div className="space-y-4">
+      {specs.map((spec) => (
+        <CurrencyField
+          key={spec.key}
+          label={spec.label}
+          value={value[spec.key]}
+          onChange={(next) => update(spec.key, next)}
+          min={spec.min}
+          max={spec.max}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <form className="space-y-8" onSubmit={(event) => event.preventDefault()}>
       <fieldset className="space-y-4">
         <legend className="eyebrow">About you</legend>
-        <div className="grid grid-cols-1 gap-4">
-          <FramedField label="Date of birth">
-            <input
-              type="date"
-              value={value.dateOfBirth}
-              onChange={(event) => update("dateOfBirth", event.target.value)}
-              className="field-input"
-              aria-label="Date of birth"
-            />
-          </FramedField>
-        </div>
+        <FramedField label="Date of birth">
+          <input
+            type="date"
+            value={value.dateOfBirth}
+            onChange={(event) => update("dateOfBirth", event.target.value)}
+            className="field-input"
+            aria-label="Date of birth"
+          />
+        </FramedField>
       </fieldset>
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         <p className="eyebrow">
           Your numbers{" "}
           <span className="font-normal normal-case tracking-normal text-[var(--ink-muted)]">
@@ -141,56 +169,106 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
           </span>
         </p>
 
-        <fieldset className="space-y-5 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
-          <legend className="eyebrow px-1 text-[var(--navy)]">Financial</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {FINANCIAL_AMOUNTS.map((spec) => (
-              <CurrencyField
-                key={spec.key}
-                label={spec.label}
-                value={value[spec.key]}
-                onChange={(next) => update(spec.key, next)}
-                min={spec.min}
-                max={spec.max}
-              />
-            ))}
+        <fieldset className="space-y-6 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
+          <legend className="eyebrow px-1 text-[var(--navy)]">Assets and Debt</legend>
+
+          <div className="space-y-4" data-testid="subsection-liquid">
+            <p className="eyebrow text-[11px] tracking-[0.14em] text-[var(--ink-muted)]">Liquid</p>
+            {renderAmounts([LIQUID_AMOUNTS[0]])}
+            <SliderRow
+              spec={NOMINAL_RETURN_SLIDER}
+              value={value.nominalReturn}
+              onChange={(next) => update("nominalReturn", next)}
+            />
+            {renderAmounts([LIQUID_AMOUNTS[1]])}
           </div>
-          <div className="space-y-5 pt-2">
-            {FINANCIAL_SLIDERS.map((spec) => (
-              <SliderRow
-                key={spec.key}
-                spec={spec}
-                value={value[spec.key]}
-                onChange={(next) => update(spec.key, next)}
-              />
-            ))}
+
+          <div className="space-y-4" data-testid="subsection-non-liquid">
+            <p className="eyebrow text-[11px] tracking-[0.14em] text-[var(--ink-muted)]">
+              Non-Liquid
+            </p>
+            {renderAmounts(NON_LIQUID_AMOUNTS)}
+          </div>
+
+          <div className="space-y-4" data-testid="subsection-debt">
+            <p className="eyebrow text-[11px] tracking-[0.14em] text-[var(--ink-muted)]">Debt</p>
+            {renderAmounts(DEBT_AMOUNTS)}
           </div>
         </fieldset>
 
-        <fieldset className="space-y-5 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
+        <fieldset className="space-y-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
+          <legend className="eyebrow px-1 text-[var(--navy)]">Income &amp; Expenses</legend>
+          {renderAmounts(INCOME_EXPENSE_AMOUNTS)}
+          <CurrencyField
+            label="Rental Income"
+            value={value.rentalIncome}
+            onChange={(next) => update("rentalIncome", next)}
+            min={0}
+            max={10_000_000}
+          />
+          <SliderRow
+            spec={RENTAL_INCOME_RATE_SLIDER}
+            value={value.rentalIncomeRate}
+            onChange={(next) => update("rentalIncomeRate", next)}
+          />
+          <CurrencyField
+            label="Windfall amount"
+            value={value.windfallAmount}
+            onChange={(next) => update("windfallAmount", next)}
+            min={0}
+            max={100_000_000}
+          />
+          <FramedField label="Windfall year">
+            <input
+              type="number"
+              min={WINDFALL_YEAR_MIN}
+              max={WINDFALL_YEAR_MAX}
+              step={1}
+              value={value.windfallYear}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                update("windfallYear", Number.isFinite(parsed) ? parsed : 0);
+              }}
+              className="field-input"
+              aria-label="Windfall year"
+              inputMode="numeric"
+            />
+          </FramedField>
+          <CurrencyField
+            label="Recurring monthly expenses"
+            value={value.monthlySpending}
+            onChange={(next) => update("monthlySpending", next)}
+            min={0}
+            max={1_000_000}
+          />
+        </fieldset>
+
+        <fieldset className="space-y-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
           <legend className="eyebrow px-1 text-[var(--navy)]">Real Estate</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {REAL_ESTATE_AMOUNTS.map((spec) => (
-              <CurrencyField
-                key={spec.key}
-                label={spec.label}
-                value={value[spec.key]}
-                onChange={(next) => update(spec.key, next)}
-                min={spec.min}
-                max={spec.max}
-              />
-            ))}
-          </div>
-          <div className="space-y-5 pt-2">
-            {REAL_ESTATE_SLIDERS.map((spec) => (
-              <SliderRow
-                key={spec.key}
-                spec={spec}
-                value={value[spec.key]}
-                onChange={(next) => update(spec.key, next)}
-              />
-            ))}
-          </div>
+          <CurrencyField
+            label={REAL_ESTATE_AMOUNTS[0].label}
+            value={value[REAL_ESTATE_AMOUNTS[0].key]}
+            onChange={(next) => update(REAL_ESTATE_AMOUNTS[0].key, next)}
+            min={REAL_ESTATE_AMOUNTS[0].min}
+            max={REAL_ESTATE_AMOUNTS[0].max}
+          />
+          <SliderRow
+            spec={PRIMARY_RESIDENCE_RATE_SLIDER}
+            value={value.primaryResidenceRate}
+            onChange={(next) => update("primaryResidenceRate", next)}
+          />
+          <CurrencyField
+            label={REAL_ESTATE_AMOUNTS[1].label}
+            value={value[REAL_ESTATE_AMOUNTS[1].key]}
+            onChange={(next) => update(REAL_ESTATE_AMOUNTS[1].key, next)}
+            min={REAL_ESTATE_AMOUNTS[1].min}
+            max={REAL_ESTATE_AMOUNTS[1].max}
+          />
+          <SliderRow
+            spec={OTHER_PROPERTY_RATE_SLIDER}
+            value={value.otherPropertyRate}
+            onChange={(next) => update("otherPropertyRate", next)}
+          />
         </fieldset>
 
         <div className="pt-2">
