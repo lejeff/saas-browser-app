@@ -7,6 +7,13 @@ export type PlanInputs = {
   annualIncome: number;
   nominalReturn: number;
   horizonYears: number;
+  cashBalance: number;
+  nonLiquidInvestments: number;
+  otherFixedAssets: number;
+  primaryResidenceValue: number;
+  otherPropertyValue: number;
+  primaryResidenceRate: number;
+  otherPropertyRate: number;
 };
 
 export type ProjectionPoint = {
@@ -23,5 +30,12 @@ export const DEFAULT_PLAN_INPUTS: PlanInputs = {
   monthlySpending: 5_000,
   annualIncome: 120_000,
   nominalReturn: 0.06,
-  horizonYears: 30
+  horizonYears: 30,
+  cashBalance: 20_000,
+  nonLiquidInvestments: 0,
+  otherFixedAssets: 0,
+  primaryResidenceValue: 400_000,
+  otherPropertyValue: 0,
+  primaryResidenceRate: 0.03,
+  otherPropertyRate: 0.03
 };
