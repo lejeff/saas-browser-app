@@ -26,7 +26,8 @@
     "zod": "^3.24.2"
   },
   "optionalDependencies": {
-    "@rolldown/binding-darwin-arm64": "^1.0.0-rc.17"
+    "@rolldown/binding-darwin-arm64": "^1.0.0-rc.17",
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.17"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
