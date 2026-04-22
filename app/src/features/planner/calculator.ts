@@ -28,11 +28,13 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
   const debt = input.startDebt;
   const nonLiquid = input.nonLiquidInvestments;
   const otherFixed = input.otherFixedAssets;
+  const startYear = now.getFullYear();
 
   let assets = input.startAssets;
   let cash = input.cashBalance;
   let residence = input.primaryResidenceValue;
   let otherProp = input.otherPropertyValue;
+  let rental = input.rentalIncome;
 
   const points: ProjectionPoint[] = [];
 
@@ -40,9 +42,10 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
     if (i > 0) {
       residence *= 1 + input.primaryResidenceRate;
       otherProp *= 1 + input.otherPropertyRate;
+      rental *= 1 + input.rentalIncomeRate;
 
       const afterReturn = assets * (1 + input.nominalReturn);
-      const netFlow = input.annualIncome - input.monthlySpending * 12;
+      const netFlow = input.annualIncome + rental - input.monthlySpending * 12;
 
       if (netFlow >= 0) {
         assets = afterReturn + netFlow;
@@ -52,10 +55,16 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
         cash -= fromCash;
         assets = afterReturn - (shortfall - fromCash);
       }
+
+      // One-off windfall lands in the investment portfolio at year-end of the
+      // matching calendar year, so it starts compounding from the following year.
+      if (startYear + i === input.windfallYear && input.windfallAmount > 0) {
+        assets += input.windfallAmount;
+      }
     }
 
     points.push({
-      year: now.getFullYear() + i,
+      year: startYear + i,
       age: currentAge + i,
       netWorth: residence + otherProp + cash + assets + nonLiquid + otherFixed - debt
     });

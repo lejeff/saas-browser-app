@@ -49,10 +49,11 @@ describe("PlannerPage", () => {
     expect(screen.getByText("Projection ends")).toBeInTheDocument();
   });
 
-  it("renders both fieldsets and the form heading", () => {
+  it("renders the three top-level categories and the form heading", () => {
     renderPage();
     expect(screen.getByText("Your plan")).toBeInTheDocument();
-    expect(screen.getByText("Financial")).toBeInTheDocument();
+    expect(screen.getByText("Assets and Debt")).toBeInTheDocument();
+    expect(screen.getByText("Income & Expenses")).toBeInTheDocument();
     expect(screen.getByText("Real Estate")).toBeInTheDocument();
   });
 
@@ -60,7 +61,7 @@ describe("PlannerPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const cashField = screen.getByLabelText("Cash balance") as HTMLInputElement;
+    const cashField = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(cashField);
     await user.type(cashField, "999999");
     await user.tab();
@@ -80,14 +81,14 @@ describe("PlannerPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const cashField = screen.getByLabelText("Cash balance") as HTMLInputElement;
+    const cashField = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(cashField);
     await user.type(cashField, "123456");
     await user.tab();
     expect(cashField.value).toBe("123,456");
 
     await user.click(screen.getByRole("button", { name: /reset to defaults/i }));
-    expect((screen.getByLabelText("Cash balance") as HTMLInputElement).value).toBe(
+    expect((screen.getByLabelText("Cash Balance") as HTMLInputElement).value).toBe(
       new Intl.NumberFormat("en-US").format(DEFAULT_PLAN_INPUTS.cashBalance)
     );
   });

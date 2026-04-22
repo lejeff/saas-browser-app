@@ -24,36 +24,60 @@ afterEach(() => {
 });
 
 describe("PlannerForm layout", () => {
-  it("renders Financial and Real Estate category headings", () => {
+  it("renders the three top-level category headings", () => {
     render(<Host />);
-    expect(screen.getByText("Financial")).toBeInTheDocument();
+    expect(screen.getByText("Assets and Debt")).toBeInTheDocument();
+    expect(screen.getByText("Income & Expenses")).toBeInTheDocument();
     expect(screen.getByText("Real Estate")).toBeInTheDocument();
   });
 
-  it("renders every Financial currency field", () => {
+  it("no longer renders a 'Financial' category heading", () => {
     render(<Host />);
-    const financial = screen.getByText("Financial").closest("fieldset")!;
-    expect(within(financial).getByLabelText("Starting financial assets")).toBeInTheDocument();
-    expect(within(financial).getByLabelText("Cash balance")).toBeInTheDocument();
-    expect(
-      within(financial).getByLabelText("Non-liquid investments / Private equity")
-    ).toBeInTheDocument();
-    expect(within(financial).getByLabelText("Other fixed assets")).toBeInTheDocument();
-    expect(within(financial).getByLabelText("Starting total debt")).toBeInTheDocument();
-    expect(within(financial).getByLabelText("Monthly spending")).toBeInTheDocument();
-    expect(within(financial).getByLabelText("Annual non-rental income")).toBeInTheDocument();
+    expect(screen.queryByText("Financial")).toBeNull();
   });
 
-  it("renders every Real Estate currency field and both appreciation sliders", () => {
+  it("groups Liquid / Non-Liquid / Debt inside Assets and Debt with the right fields", () => {
+    render(<Host />);
+    const assets = screen.getByText("Assets and Debt").closest("fieldset")!;
+
+    const liquid = within(assets).getByTestId("subsection-liquid");
+    expect(within(liquid).getByText("Liquid")).toBeInTheDocument();
+    expect(within(liquid).getByLabelText("Financial Assets / Portfolio")).toBeInTheDocument();
+    expect(within(liquid).getByLabelText("Cash Balance")).toBeInTheDocument();
+    expect(within(liquid).getByText("Expected annual return")).toBeInTheDocument();
+
+    const nonLiquid = within(assets).getByTestId("subsection-non-liquid");
+    expect(within(nonLiquid).getByText("Non-Liquid")).toBeInTheDocument();
+    expect(within(nonLiquid).getByLabelText("Private Equity")).toBeInTheDocument();
+    expect(within(nonLiquid).getByLabelText("Other Fixed Assets")).toBeInTheDocument();
+
+    const debt = within(assets).getByTestId("subsection-debt");
+    // The subsection header and the field label both read "Debt", so we target
+    // the input via its accessible name and rely on the testid to confirm the
+    // subsection itself renders.
+    expect(within(debt).getByLabelText("Debt")).toBeInTheDocument();
+  });
+
+  it("renders every Income & Expenses field including the new ones", () => {
+    render(<Host />);
+    const fs = screen.getByText("Income & Expenses").closest("fieldset")!;
+    expect(within(fs).getByLabelText("Annual Salary")).toBeInTheDocument();
+    expect(within(fs).getByLabelText("Annual Rental Income")).toBeInTheDocument();
+    expect(within(fs).getByText("Rental income annual appreciation")).toBeInTheDocument();
+    expect(within(fs).getByLabelText("Windfall amount")).toBeInTheDocument();
+    expect(within(fs).getByLabelText("Windfall year")).toBeInTheDocument();
+    expect(within(fs).getByLabelText("Recurring monthly expenses")).toBeInTheDocument();
+  });
+
+  it("renders every Real Estate field and both appreciation sliders inside the category", () => {
     render(<Host />);
     const realEstate = screen.getByText("Real Estate").closest("fieldset")!;
-    expect(within(realEstate).getByLabelText("Primary residence value")).toBeInTheDocument();
-    expect(within(realEstate).getByLabelText("Other property value")).toBeInTheDocument();
-    expect(within(realEstate).getByText("Primary residence appreciation")).toBeInTheDocument();
-    expect(within(realEstate).getByText("Other property appreciation")).toBeInTheDocument();
+    expect(within(realEstate).getByLabelText("Primary Residence value")).toBeInTheDocument();
+    expect(within(realEstate).getByLabelText("Other Property value")).toBeInTheDocument();
+    expect(within(realEstate).getAllByText("Annual appreciation rate")).toHaveLength(2);
   });
 
-  it("keeps the Projection horizon slider outside the two categories", () => {
+  it("keeps the Projection horizon slider outside all three categories", () => {
     render(<Host />);
     const horizonLabel = screen.getByText("Projection horizon");
     expect(horizonLabel.closest("fieldset")).toBeNull();
@@ -64,13 +88,22 @@ describe("PlannerForm layout", () => {
     expect(screen.queryByLabelText("Name")).toBeNull();
   });
 
-  it("updates the Cash balance field when the user types", async () => {
+  it("updates the Cash Balance field when the user types", async () => {
     const user = userEvent.setup();
     render(<Host />);
-    const field = screen.getByLabelText("Cash balance") as HTMLInputElement;
+    const field = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(field);
     await user.type(field, "75000");
     expect(field.value).toBe("75,000");
+  });
+
+  it("updates the Windfall year field when the user types", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    const field = screen.getByLabelText("Windfall year") as HTMLInputElement;
+    await user.clear(field);
+    await user.type(field, "2045");
+    expect(field.value).toBe("2045");
   });
 
   it("invokes onReset when the reset button is clicked", async () => {
