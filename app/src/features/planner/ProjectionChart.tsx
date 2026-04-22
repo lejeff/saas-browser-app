@@ -10,39 +10,83 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import { useCurrency } from "@/features/currency/CurrencyContext";
 import type { ProjectionPoint } from "./types";
 
 type Props = {
   data: ProjectionPoint[];
 };
 
-const compactCurrency = (value: number) => {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
-  return `${sign}$${abs.toFixed(0)}`;
+const TEAL = "#00c6b8";
+const CORAL = "#ff7a59";
+const NAVY = "#0f2239";
+const INK_SOFT = "#4b5b74";
+const BORDER = "#e6e3da";
+
+type ChartTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{ payload?: ProjectionPoint }>;
+  format: (v: number) => string;
 };
 
-export function ProjectionChart({ data }: Props) {
+function ChartTooltip({ active, payload, label, format }: ChartTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const point = payload[0]?.payload;
+  if (!point) return null;
+  const isPositive = point.netWorth >= 0;
   return (
-    <div className="h-[400px] w-full">
+    <div
+      className="rounded-xl border bg-white px-3.5 py-2.5 shadow-[0_10px_30px_-12px_rgba(15,34,57,0.25)]"
+      style={{ borderColor: BORDER }}
+    >
+      <div
+        className="text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: INK_SOFT }}
+      >
+        {`Year ${label} · Age ${point.age}`}
+      </div>
+      <div
+        className="mt-1 font-medium tabular-nums"
+        style={{
+          fontFamily: "var(--font-display), serif",
+          fontSize: "1.125rem",
+          color: isPositive ? NAVY : CORAL
+        }}
+      >
+        {format(point.netWorth)}
+      </div>
+    </div>
+  );
+}
+
+export function ProjectionChart({ data }: Props) {
+  const { format, formatCompact } = useCurrency();
+  return (
+    <div className="h-[440px] w-full">
       <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-          <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-          <YAxis tickFormatter={compactCurrency} tick={{ fontSize: 12 }} width={70} />
-          <Tooltip
-            formatter={(value) => [compactCurrency(Number(value)), "Net worth"]}
-            labelFormatter={(label, payload) => {
-              const point = payload?.[0]?.payload as ProjectionPoint | undefined;
-              return point ? `Year ${label} (age ${point.age})` : `Year ${label}`;
-            }}
+        <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={BORDER} vertical={false} />
+          <XAxis
+            dataKey="year"
+            tick={{ fontSize: 11, fill: INK_SOFT }}
+            tickLine={false}
+            axisLine={{ stroke: BORDER }}
           />
-          <Bar dataKey="netWorth" isAnimationActive={false}>
+          <YAxis
+            tickFormatter={(v) => formatCompact(Number(v))}
+            tick={{ fontSize: 11, fill: INK_SOFT }}
+            tickLine={false}
+            axisLine={false}
+            width={72}
+          />
+          <Tooltip
+            cursor={{ fill: "rgba(15, 34, 57, 0.04)" }}
+            content={<ChartTooltip format={format} />}
+          />
+          <Bar dataKey="netWorth" radius={[6, 6, 0, 0]} isAnimationActive={false}>
             {data.map((point) => (
-              <Cell key={point.year} fill={point.netWorth >= 0 ? "#10b981" : "#ef4444"} />
+              <Cell key={point.year} fill={point.netWorth >= 0 ? TEAL : CORAL} />
             ))}
           </Bar>
         </BarChart>
