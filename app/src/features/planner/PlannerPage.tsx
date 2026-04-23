@@ -81,10 +81,6 @@ export function PlannerPage() {
               <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
             <ProjectionChart data={displayed} />
-            <div className="mt-4 flex items-center gap-5 text-xs text-[var(--ink-soft)]">
-              <LegendSwatch color="var(--teal)" label="Positive" />
-              <LegendSwatch color="var(--coral)" label="Negative" />
-            </div>
           </div>
           <div className="card p-6 md:p-7">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -92,10 +88,6 @@ export function PlannerPage() {
               <span className="eyebrow">Portfolio + Cash</span>
             </div>
             <CashPositionChart data={displayed} />
-            <div className="mt-4 flex items-center gap-5 text-xs text-[var(--ink-soft)]">
-              <LegendSwatch color="var(--teal)" label="Positive" />
-              <LegendSwatch color="var(--coral)" label="Shortfall" />
-            </div>
             {firstNegativeLiquid ? (
               <LiquidityWarning
                 year={firstNegativeLiquid.year}
@@ -204,18 +196,5 @@ function StatCard({ eyebrow, value, hint, accent = "none" }: StatCardProps) {
         {hint ? <div className="text-sm text-[var(--ink-soft)]">{hint}</div> : null}
       </div>
     </div>
-  );
-}
-
-function LegendSwatch({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="h-2.5 w-2.5 rounded-sm"
-        style={{ background: color }}
-        aria-hidden="true"
-      />
-      {label}
-    </span>
   );
 }
