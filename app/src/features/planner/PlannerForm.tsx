@@ -222,29 +222,6 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             onChange={(next) => update("rentalIncomeRate", next)}
           />
           <CurrencyField
-            label="Windfall amount"
-            value={value.windfallAmount}
-            onChange={(next) => update("windfallAmount", next)}
-            min={0}
-            max={100_000_000}
-          />
-          <FramedField label="Windfall year">
-            <input
-              type="number"
-              min={WINDFALL_YEAR_MIN}
-              max={WINDFALL_YEAR_MAX}
-              step={1}
-              value={value.windfallYear}
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
-                update("windfallYear", Number.isFinite(parsed) ? parsed : 0);
-              }}
-              className="field-input"
-              aria-label="Windfall year"
-              inputMode="numeric"
-            />
-          </FramedField>
-          <CurrencyField
             label="Recurring monthly expenses"
             value={value.monthlySpending}
             onChange={(next) => update("monthlySpending", next)}
@@ -279,6 +256,33 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             value={value.otherPropertyRate}
             onChange={(next) => update("otherPropertyRate", next)}
           />
+        </fieldset>
+
+        <fieldset className="space-y-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface)] p-5">
+          <legend className="eyebrow px-1 text-[var(--navy)]">Life Events</legend>
+          <CurrencyField
+            label="Windfall amount"
+            value={value.windfallAmount}
+            onChange={(next) => update("windfallAmount", next)}
+            min={0}
+            max={100_000_000}
+          />
+          <FramedField label="Windfall year">
+            <input
+              type="number"
+              min={WINDFALL_YEAR_MIN}
+              max={WINDFALL_YEAR_MAX}
+              step={1}
+              value={value.windfallYear}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                update("windfallYear", Number.isFinite(parsed) ? parsed : 0);
+              }}
+              className="field-input"
+              aria-label="Windfall year"
+              inputMode="numeric"
+            />
+          </FramedField>
         </fieldset>
 
         <div className="space-y-4 pt-2">

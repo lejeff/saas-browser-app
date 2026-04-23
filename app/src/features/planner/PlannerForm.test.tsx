@@ -64,9 +64,21 @@ describe("PlannerForm layout", () => {
     expect(within(fs).getByLabelText("Annual Salary")).toBeInTheDocument();
     expect(within(fs).getByLabelText("Annual Rental Income")).toBeInTheDocument();
     expect(within(fs).getByText("Rental income annual appreciation")).toBeInTheDocument();
+    expect(within(fs).getByLabelText("Recurring monthly expenses")).toBeInTheDocument();
+  });
+
+  it("renders the Life Events fieldset with Windfall amount and year", () => {
+    render(<Host />);
+    const fs = screen.getByText("Life Events").closest("fieldset")!;
     expect(within(fs).getByLabelText("Windfall amount")).toBeInTheDocument();
     expect(within(fs).getByLabelText("Windfall year")).toBeInTheDocument();
-    expect(within(fs).getByLabelText("Recurring monthly expenses")).toBeInTheDocument();
+  });
+
+  it("does not render Windfall fields inside Income & Expenses", () => {
+    render(<Host />);
+    const fs = screen.getByText("Income & Expenses").closest("fieldset")!;
+    expect(within(fs).queryByLabelText("Windfall amount")).toBeNull();
+    expect(within(fs).queryByLabelText("Windfall year")).toBeNull();
   });
 
   it("renders every Real Estate field and both appreciation sliders inside the category", () => {
