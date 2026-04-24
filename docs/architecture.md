@@ -10,7 +10,7 @@
 
 <span class="badge badge-active">ACTIVE</span> running today in production at `planner.boombaleia.com`.  
 <span class="badge badge-dormant">WIRED-DORMANT</span> code and configuration are shipped, but the service is idle until a credential (DSN / API key / secret) is added to Vercel. Turning it on is a one-variable change, no redeploy needed if configured at the project level.  
-<span class="badge badge-planned">PLANNED</span> not yet built. The M1 / M2 / M3 tag indicates the milestone that introduces it.
+<span class="badge badge-planned">PLANNED</span> not yet built. The M1 / M2 / M3 / M4 tag indicates the milestone that introduces it.
 
 ---
 
@@ -86,7 +86,7 @@ The shaded `Vercel EU` and `Supabase Frankfurt` groups are the two stateful / co
 | **`@app/core` package** | Pure domain logic (schema + projection math) | N/A (library) | Nothing; it's pure functions | <span class="badge badge-active">ACTIVE</span> |
 | **Supabase Auth** | User sign-in (email magic-link) | Frankfurt | Email, hashed password (if used), session rows | <span class="badge badge-planned">PLANNED (M1)</span> |
 | **Supabase Postgres** | Scenarios, simulations, subscriptions, chat history | Frankfurt | All durable user content | <span class="badge badge-planned">PLANNED (M1)</span> |
-| **Stripe** | Subscription billing | US (PCI-scoped) | Customer record, subscription state, payment methods | <span class="badge badge-planned">PLANNED (M3)</span> |
+| **Stripe** | Subscription billing | US (PCI-scoped) | Customer record, subscription state, payment methods | <span class="badge badge-planned">PLANNED (M4)</span> |
 | **Resend** | Transactional email | EU | Email delivery logs (from, to, subject, status) | <span class="badge badge-planned">PLANNED (M1)</span> |
 | **Sentry** | Error + performance telemetry | EU | Exception stack traces, perf spans, release metadata | <span class="badge badge-dormant">WIRED-DORMANT</span> |
 | **PostHog** | Product analytics | EU Cloud | `$pageview`, `$pageleave`, explicit `capture(...)` calls | <span class="badge badge-dormant">WIRED-DORMANT</span> |
@@ -151,7 +151,7 @@ With RLS enabled, even a bug that accidentally queries `select * from scenarios`
 
 See the full planned schema in [Data model](#data-model).
 
-### 2.6 Stripe <span class="badge badge-planned">PLANNED (M3)</span>
+### 2.6 Stripe <span class="badge badge-planned">PLANNED (M4)</span>
 
 Checkout-hosted flow (no PCI scope on our side). The checkout route is already scaffolded at [`app/src/app/api/billing/checkout/route.ts`](../app/src/app/api/billing/checkout/route.ts). Webhook signatures are verified with `STRIPE_WEBHOOK_SECRET` in [`app/src/app/api/webhooks/stripe/route.ts`](../app/src/app/api/webhooks/stripe/route.ts).
 
@@ -284,7 +284,7 @@ sequenceDiagram
     F-->>B: 200 { summary, histogram }
 ```
 
-### 3.5 Stripe checkout + webhook <span class="badge badge-planned">PLANNED (M3)</span>
+### 3.5 Stripe checkout + webhook <span class="badge badge-planned">PLANNED (M4)</span>
 
 ```mermaid
 sequenceDiagram
@@ -374,7 +374,7 @@ The only persistent data model today is `PlanInputs`, defined as a Zod schema in
 
 Derived output: `ProjectionPoint[]` with `{ year, age, netWorth, liquid, savings, otherAssets, realEstate, debt }`.
 
-### 4.2 Target (M1 → M3) <span class="badge badge-planned">PLANNED</span>
+### 4.2 Target (M1 → M4) <span class="badge badge-planned">PLANNED</span>
 
 ```mermaid
 erDiagram
@@ -637,7 +637,7 @@ Headers come from [`app/next.config.ts`](../app/next.config.ts)'s `headers()` ex
 - **AuthN**: Supabase GoTrue email magic-link. HttpOnly cookie session. No long-lived JWT in the client.
 - **AuthZ**: Postgres RLS. The app never decides who can see what — the database does.
 - **CSRF**: Server Actions are POST-only, same-origin. Next.js adds an internal same-origin check by default in App Router.
-- **Rate limiting**: Supabase Auth has built-in rate limiting on sign-in endpoints; we'll add a per-IP limiter in front of `/api/simulate` and `/api/chat` using Vercel's KV or Upstash Redis in M2.
+- **Rate limiting**: Supabase Auth has built-in rate limiting on sign-in endpoints; we'll add a per-IP limiter in front of `/api/chat` in M3 (and `/api/webhooks/stripe` in M4) using Vercel's KV or Upstash Redis.
 
 ---
 

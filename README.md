@@ -4,6 +4,8 @@ A browser-based financial planning app: interactive long-horizon net-worth proje
 
 Production deploy: **https://planner.boombaleia.com**
 
+Roadmap: see [`ROADMAP.md`](ROADMAP.md) for the current milestone plan (M0 foundation shipped, M1–M4 planned).
+
 Architecture documentation: see [`docs/architecture.md`](docs/architecture.md) (source), [`docs/architecture.pdf`](docs/architecture.pdf) (print-ready), and [`docs/architecture.html`](docs/architecture.html) (standalone, self-contained HTML with inline diagrams).
 
 ## Stack
@@ -11,7 +13,7 @@ Architecture documentation: see [`docs/architecture.md`](docs/architecture.md) (
 - **Next.js 15** (App Router) + TypeScript + Tailwind v4
 - **Recharts** for all interactive visualizations
 - **Supabase** (EU / Frankfurt) — Postgres + Auth + RLS
-- **Stripe** — subscription billing (M3+)
+- **Stripe** — subscription billing (M4)
 - **Sentry** (EU region) — error and performance monitoring
 - **PostHog** (EU cloud) — product analytics + session replay
 - **Vercel** (functions pinned to `fra1`) — hosting and preview deploys
