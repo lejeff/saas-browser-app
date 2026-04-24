@@ -3,6 +3,8 @@
 Historical [Cursor Plan-mode](https://cursor.com/docs) plans from building this project, copied from `~/.cursor/plans/`.
 Filenames are prefixed with the date the plan was created.
 
+> For the current roadmap of upcoming work, see [`ROADMAP.md`](../../ROADMAP.md) at the repo root.
+
 **21 plans** across 3 days.
 
 ## 2026-04-22
