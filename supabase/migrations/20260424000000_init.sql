@@ -1,0 +1,10 @@
+-- Initial migration (M0).
+--
+-- This file is intentionally empty. M0 only establishes the Supabase project
+-- and migration infrastructure; no tables exist yet. M1 will populate the
+-- schema with:
+--   - profiles (1:1 with auth.users)
+--   - scenarios (user-owned plan documents)
+--   - scenario_runs (Monte Carlo execution history, later)
+-- All tables will have RLS enabled from their creation migration — never
+-- introduce a table without an RLS policy in the same migration.

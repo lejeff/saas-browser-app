@@ -6,7 +6,7 @@ export function SiteFooter() {
         <div className="grid gap-8 md:grid-cols-[1.5fr_1fr_1fr]">
           <div>
             <div className="font-display text-base font-medium text-[var(--navy)]">
-              Retirement Planner
+              Financial Planner
             </div>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">
               Interactive retirement projections. Your inputs stay on your device &mdash; we
@@ -51,7 +51,7 @@ export function SiteFooter() {
             investment, or tax advice. Projections are hypothetical and based solely on inputs you
             provide.
           </p>
-          <p className="mt-3">&copy; {year} Retirement Planner. All rights reserved.</p>
+          <p className="mt-3">&copy; {year} Financial Planner. All rights reserved.</p>
         </div>
       </div>
     </footer>

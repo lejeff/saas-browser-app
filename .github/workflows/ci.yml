@@ -5,15 +5,28 @@ on:
   push:
     branches: [main]
 
+# Placeholder values that satisfy the strict env schema in CI without needing
+# real secrets. Prod secrets live in Vercel; CI only needs well-formed inputs
+# so `next build` and the e2e suite can exercise the full code path.
+env:
+  NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+  NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.local
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+  NEXT_PUBLIC_POSTHOG_HOST: https://eu.i.posthog.com
+  SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+  STRIPE_SECRET_KEY: sk_test_ci_placeholder
+  STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+  STRIPE_PRICE_ID_PRO: price_ci_placeholder
+  RESEND_API_KEY: re_ci_placeholder
+
 jobs:
   checks:
+    name: Lint, typecheck, unit tests, build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -32,3 +45,45 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --include=optional --no-audit --no-fund
+
+      # Cache Playwright browsers across runs — ~200MB download otherwise.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx -w app playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx -w app playwright install-deps chromium
+
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: app/playwright-report/
+          retention-days: 14

@@ -1,0 +1,5 @@
+-- Local-only seed data.
+--
+-- This file runs automatically after `supabase db reset` and is never applied
+-- to remote projects. Add developer fixtures here as tables are introduced
+-- in M1+ (e.g. a demo user in auth.users + a few sample scenarios).

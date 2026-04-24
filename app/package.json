@@ -1,5 +1,5 @@
 {
-  "name": "saas-browser-app",
+  "name": "financial-planner-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@app/core": "*",
     "@sentry/nextjs": "^9.22.0",
     "@stripe/stripe-js": "^4.4.0",
     "@supabase/ssr": "^0.5.2",
@@ -22,6 +23,7 @@
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
     "resend": "^4.3.0",
+    "server-only": "0.0.1",
     "stripe": "^16.12.0",
     "zod": "^3.24.2"
   },

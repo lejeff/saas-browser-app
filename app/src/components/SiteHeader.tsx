@@ -28,7 +28,7 @@ export function SiteHeader() {
         <Link href="/" className="flex items-center gap-2.5">
           <LogoMark />
           <span className="font-display text-lg font-medium text-[var(--navy)]">
-            Retirement Planner
+            Financial Planner
           </span>
         </Link>
 

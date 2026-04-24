@@ -12,7 +12,7 @@ import {
   YAxis
 } from "recharts";
 import { useCurrency } from "@/features/currency/CurrencyContext";
-import type { ProjectionPoint } from "./types";
+import type { ProjectionPoint } from "@app/core";
 
 type Props = {
   data: ProjectionPoint[];

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearInputs, loadInputs, saveInputs } from "@/features/planner/storage";
-import { DEFAULT_PLAN_INPUTS } from "@/features/planner/types";
+import { DEFAULT_PLAN_INPUTS } from "@app/core";
 
 type FakeStorage = {
   getItem: (key: string) => string | null;

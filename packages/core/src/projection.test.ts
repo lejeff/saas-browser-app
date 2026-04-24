@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_HORIZON_YEARS,
+  MIN_HORIZON_YEARS,
   ageFromDob,
   clampHorizon,
   deflateToToday,
-  MAX_HORIZON_YEARS,
-  MIN_HORIZON_YEARS,
-  projectNetWorth
-} from "@/features/planner/calculator";
-import type { PlanInputs, ProjectionPoint } from "@/features/planner/types";
+  projectNetWorth,
+  type PlanInputs,
+  type ProjectionPoint
+} from "./index";
 
 const FIXED_NOW = new Date("2026-06-15T00:00:00Z");
 
@@ -316,17 +317,12 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 0 and every subsequent year: assets stay at 100k (afterReturn + 0),
-    // cash stays at 50k, NW = 150k at every point.
     for (const p of points) {
       expect(p.netWorth).toBe(150_000);
     }
   });
 
   it("does not draw down residence or other property during deep shortfall", () => {
-    // Zero cash, zero assets, zero income, spending > 0. Residence and other
-    // property must still compound; assets may go negative, but the property
-    // buckets must equal their deterministic compounded values.
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -370,7 +366,6 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 0: assets 0, no NW. Year 1: rental 20k compounds (rate 0) → 20k added to assets.
     expect(points[0].netWorth).toBe(0);
     money(points[1].netWorth, 20_000);
     money(points[2].netWorth, 40_000);
@@ -389,9 +384,6 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 1: rental grows once to 11k → assets 11k.
-    // Year 2: rental grows to 12.1k → assets 11k + 12.1k = 23.1k.
-    // Year 3: rental 13.31k → assets 36.41k.
     money(points[1].netWorth, 11_000);
     money(points[2].netWorth, 23_100);
     money(points[3].netWorth, 36_410);
@@ -427,9 +419,7 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Years 0..2: nothing happens.
     for (let i = 0; i <= 2; i += 1) expect(points[i].netWorth).toBe(0);
-    // Year 3: windfall lands. Year 4+: stays in assets (no return, no flows).
     expect(points[3].netWorth).toBe(100_000);
     expect(points[4].netWorth).toBe(100_000);
   });
@@ -448,8 +438,6 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 2: windfall lands at year-end → 100k.
-    // Year 3: 100k * 1.1 = 110k. Year 4: 121k.
     money(points[2].netWorth, 100_000);
     money(points[3].netWorth, 110_000);
     money(points[4].netWorth, 121_000);
@@ -500,12 +488,6 @@ describe("projectNetWorth", () => {
   });
 
   it("lands the windfall in assets, not cash (cash unchanged for the windfall year)", () => {
-    // Set up so netFlow = 0 every year (salary matches spending, no rental). Then
-    // cashBalance is untouched by the flows; if the windfall ever went to cash it
-    // would raise NW starting at the windfall year by less than the full amount
-    // (since cash has no return). Here we use nominalReturn = 0 and a cash
-    // starting balance so we can assert cash stays exactly at its start value
-    // for every projection year.
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -519,18 +501,12 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 0..3: only cash (50k), assets 0.
     for (let i = 0; i <= 3; i += 1) expect(points[i].netWorth).toBe(50_000);
-    // Year 4: windfall lands in assets. Cash still 50k, assets now 25k.
     expect(points[4].netWorth).toBe(75_000);
-    // Year 5: no return, no flow change → stays at 75k.
     expect(points[5].netWorth).toBe(75_000);
   });
 
   it("excludes rental income from direct net-worth contribution", () => {
-    // Rental income only flows through assets via the netFlow equation. If it
-    // were added directly, year 0 NW would already reflect it (spoiler: it
-    // shouldn't).
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -565,20 +541,12 @@ describe("projectNetWorth", () => {
       },
       FIXED_NOW
     );
-    // Year 0: 100 + 100 + 10 + 100 + 5 + 5 - 50 = 270k
     expect(points[0].netWorth).toBe(270_000);
-    // Year 1: residence 110k, other 100k, afterReturn 110k, shortfall 12k drains
-    // cash 10k → 0 and pulls 2k from assets → 108k. NW = 110+100+0+108+5+5-50 = 278k
     money(points[1].netWorth, 278_000);
-    // Year 2: residence 121k, other 100k, afterReturn 118.8k, shortfall 12k all
-    // from assets → 106.8k. NW = 121+100+0+106.8+5+5-50 = 287.8k
     money(points[2].netWorth, 287_800);
   });
 
   it("inflates salary and spending when inflationRate > 0", () => {
-    // No return, no existing assets, pure flows. With inflation 2%, year 1
-    // salary is 50_000 * 1.02 and spending is 12_000 * 1.02. netFlow =
-    // 38_000 * 1.02 = 38_760. Without inflation (rate 0) it would be 38_000.
     const inflated = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -599,8 +567,6 @@ describe("projectNetWorth", () => {
   });
 
   it("keeps cash nominally flat regardless of inflation", () => {
-    // Cash is nominal and does not inflate. With no other flows and no return,
-    // netWorth must equal starting cash at every year regardless of inflation.
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -833,8 +799,6 @@ describe("projectNetWorth liquid field", () => {
   });
 
   it("does not include non-liquid, other fixed, or property in liquid", () => {
-    // Liquid excludes residence, other property, non-liquid investments, other
-    // fixed assets, and debt — only cash + financial portfolio are liquid.
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -852,8 +816,6 @@ describe("projectNetWorth liquid field", () => {
   });
 
   it("drops liquid as cash drains during a shortfall", () => {
-    // Year 1 shortfall = 12_000. Cash 20_000 → 8_000. Assets untouched at 100k.
-    // liquid year 1 = 100_000 + 8_000 = 108_000 (cash drained, assets kept).
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -870,9 +832,6 @@ describe("projectNetWorth liquid field", () => {
   });
 
   it("lets liquid go negative once cash is gone and assets are overdrawn", () => {
-    // startAssets 10_000, cashBalance 5_000, spending 2_000/mo, no income, no
-    // return. Year 1 shortfall 24_000 → cash 0, assets 10_000 - 19_000 = -9_000.
-    // liquid = -9_000 + 0 = -9_000.
     const points = projectNetWorth(
       {
         ...BASE_INPUTS,
@@ -886,7 +845,6 @@ describe("projectNetWorth liquid field", () => {
     );
     expect(points[0].liquid).toBe(15_000);
     expect(points[1].liquid).toBe(-9_000);
-    // Year 2: another 24_000 shortfall, all from assets → -33_000.
     expect(points[2].liquid).toBe(-33_000);
   });
 
@@ -919,7 +877,6 @@ describe("projectNetWorth liquid field", () => {
       },
       FIXED_NOW
     );
-    // netFlow = 0 every year; cash stays at 50k, assets stay at 0.
     for (const p of points) expect(p.liquid).toBe(50_000);
   });
 });

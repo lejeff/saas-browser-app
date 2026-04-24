@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlannerForm } from "./PlannerForm";
-import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "./types";
+import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "@app/core";
 import { CurrencyProvider } from "@/features/currency/CurrencyContext";
 
 function Host({ onReset = vi.fn() }: { onReset?: () => void } = {}) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import { stripe } from "@/lib/stripe";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { writeAuditEvent } from "@/server/security/audit-log";
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: env.STRIPE_PRICE_ID_PRO, quantity: 1 }],
+    line_items: [{ price: serverEnv.STRIPE_PRICE_ID_PRO, quantity: 1 }],
     customer_email: payload.email,
     success_url: `${env.NEXT_PUBLIC_APP_URL}/settings/billing?success=1`,
     cancel_url: `${env.NEXT_PUBLIC_APP_URL}/settings/billing?canceled=1`

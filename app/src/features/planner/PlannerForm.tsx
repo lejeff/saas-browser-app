@@ -7,9 +7,9 @@ import {
   MAX_APPRECIATION,
   MAX_HORIZON_YEARS,
   MIN_APPRECIATION,
-  MIN_HORIZON_YEARS
-} from "./calculator";
-import type { PlanInputs } from "./types";
+  MIN_HORIZON_YEARS,
+  type PlanInputs
+} from "@app/core";
 
 type Props = {
   value: PlanInputs;

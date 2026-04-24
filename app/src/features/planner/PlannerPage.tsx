@@ -4,9 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CashPositionChart } from "./CashPositionChart";
 import { PlannerForm } from "./PlannerForm";
 import { ProjectionChart } from "./ProjectionChart";
-import { ageFromDob, deflateToToday, projectNetWorth } from "./calculator";
+import {
+  DEFAULT_PLAN_INPUTS,
+  ageFromDob,
+  deflateToToday,
+  projectNetWorth,
+  type PlanInputs
+} from "@app/core";
 import { loadInputs, saveInputs } from "./storage";
-import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "./types";
 import { useCurrency } from "@/features/currency/CurrencyContext";
 
 type ViewMode = "real" | "nominal";

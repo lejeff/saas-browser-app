@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { env } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import { stripe } from "@/lib/stripe";
 import { writeAuditEvent } from "@/server/security/audit-log";
 
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
-  const event = stripe.webhooks.constructEvent(body, signature, env.STRIPE_WEBHOOK_SECRET);
+  const event = stripe.webhooks.constructEvent(body, signature, serverEnv.STRIPE_WEBHOOK_SECRET);
 
   if (event.type === "checkout.session.completed") {
     await writeAuditEvent({

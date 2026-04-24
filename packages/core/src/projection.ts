@@ -1,10 +1,4 @@
-import type { PlanInputs, ProjectionPoint } from "./types";
-
-export const MIN_HORIZON_YEARS = 10;
-export const MAX_HORIZON_YEARS = 80;
-
-export const MIN_APPRECIATION = -0.05;
-export const MAX_APPRECIATION = 0.1;
+import type { PlanInputs, ProjectionPoint } from "./planInputs";
 
 export function ageFromDob(dateOfBirth: string, now: Date = new Date()): number {
   const dob = new Date(dateOfBirth);
@@ -17,9 +11,9 @@ export function ageFromDob(dateOfBirth: string, now: Date = new Date()): number 
   return Math.max(0, age);
 }
 
-export function clampHorizon(horizonYears: number): number {
-  if (!Number.isFinite(horizonYears)) return MIN_HORIZON_YEARS;
-  return Math.min(Math.max(Math.round(horizonYears), MIN_HORIZON_YEARS), MAX_HORIZON_YEARS);
+export function clampHorizon(horizonYears: number, min = 10, max = 80): number {
+  if (!Number.isFinite(horizonYears)) return min;
+  return Math.min(Math.max(Math.round(horizonYears), min), max);
 }
 
 export function projectNetWorth(input: PlanInputs, now: Date = new Date()): ProjectionPoint[] {

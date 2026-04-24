@@ -3,8 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CurrencyProvider } from "@/features/currency/CurrencyContext";
 import { PlannerPage } from "./PlannerPage";
-import { DEFAULT_PLAN_INPUTS } from "./types";
-import { ageFromDob } from "./calculator";
+import { DEFAULT_PLAN_INPUTS, ageFromDob } from "@app/core";
 
 // Recharts uses ResponsiveContainer which requires layout dimensions jsdom can't
 // provide. We stub it with a fixed-size div so the chart renders a valid SVG

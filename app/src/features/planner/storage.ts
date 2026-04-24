@@ -1,4 +1,4 @@
-import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "./types";
+import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "@app/core";
 
 const STORAGE_KEY = "planner.inputs.v1";
 
