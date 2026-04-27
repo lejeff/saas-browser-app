@@ -32,7 +32,9 @@ type SliderKey =
   | "primaryResidenceRate"
   | "otherPropertyRate"
   | "rentalIncomeRate"
-  | "debtInterestRate";
+  | "debtInterestRate"
+  | "nonLiquidLiquidityYear"
+  | "otherFixedLiquidityYear";
 
 type SliderSpec = {
   key: SliderKey;
@@ -46,6 +48,19 @@ type SliderSpec = {
 const percent = (v: number) => `${(v * 100).toFixed(1)}%`;
 const years = (v: number) => `${v} year${v === 1 ? "" : "s"}`;
 const age = (v: number) => `${v}`;
+const rawYear = (v: number) => String(v);
+
+// Human-readable description of a calendar year relative to "now". Used as
+// helper text under year-based sliders so users don't have to subtract in
+// their head.
+const yearsFromNow = (year: number, now: number): string => {
+  const d = year - now;
+  if (d === 0) return "this year";
+  if (d === 1) return "in 1 year";
+  if (d > 1) return `in ${d} years`;
+  if (d === -1) return "1 year ago";
+  return `${-d} years ago`;
+};
 
 const NOMINAL_RETURN_SLIDER: SliderSpec = {
   key: "nominalReturn",
@@ -228,6 +243,32 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
     onChange({ ...value, [key]: next });
   };
 
+  // Recomputed per render so the helper text under the liquidity sliders
+  // stays in sync if the page sits open across a year boundary. The
+  // projection itself uses the `now` argument passed to `projectNetWorth`
+  // for testability — this is purely UI.
+  const currentYear = new Date().getFullYear();
+  const liquidityYearMin = currentYear;
+  const liquidityYearMax = currentYear + MAX_HORIZON_YEARS;
+
+  const NON_LIQUID_LIQUIDITY_YEAR_SLIDER: SliderSpec = {
+    key: "nonLiquidLiquidityYear",
+    label: "Liquidity year",
+    min: liquidityYearMin,
+    max: liquidityYearMax,
+    step: 1,
+    format: rawYear
+  };
+
+  const OTHER_FIXED_LIQUIDITY_YEAR_SLIDER: SliderSpec = {
+    key: "otherFixedLiquidityYear",
+    label: "Liquidity year",
+    min: liquidityYearMin,
+    max: liquidityYearMax,
+    step: 1,
+    format: rawYear
+  };
+
   const renderAmounts = (specs: AmountSpec[]) => (
     <div className="space-y-4">
       {specs.map((spec) => (
@@ -312,7 +353,37 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             accent={ACCENT.assetsDebt}
             testId="subsection-non-liquid"
           >
-            {renderAmounts(NON_LIQUID_AMOUNTS)}
+            {/* Each non-liquid bucket pairs an amount field with a liquidity
+                year slider; at that year the projection moves the value into
+                the liquid portfolio so it begins compounding. */}
+            <div className="space-y-4">
+              <CurrencyField
+                label={NON_LIQUID_AMOUNTS[0].label}
+                value={value.nonLiquidInvestments}
+                onChange={(next) => update("nonLiquidInvestments", next)}
+                min={NON_LIQUID_AMOUNTS[0].min}
+                max={NON_LIQUID_AMOUNTS[0].max}
+              />
+              <SliderRow
+                spec={NON_LIQUID_LIQUIDITY_YEAR_SLIDER}
+                value={value.nonLiquidLiquidityYear}
+                onChange={(next) => update("nonLiquidLiquidityYear", next)}
+                helper={yearsFromNow(value.nonLiquidLiquidityYear, currentYear)}
+              />
+              <CurrencyField
+                label={NON_LIQUID_AMOUNTS[1].label}
+                value={value.otherFixedAssets}
+                onChange={(next) => update("otherFixedAssets", next)}
+                min={NON_LIQUID_AMOUNTS[1].min}
+                max={NON_LIQUID_AMOUNTS[1].max}
+              />
+              <SliderRow
+                spec={OTHER_FIXED_LIQUIDITY_YEAR_SLIDER}
+                value={value.otherFixedLiquidityYear}
+                onChange={(next) => update("otherFixedLiquidityYear", next)}
+                helper={yearsFromNow(value.otherFixedLiquidityYear, currentYear)}
+              />
+            </div>
           </CollapsibleSubsection>
 
           <CollapsibleSubsection
@@ -638,11 +709,16 @@ function DebtScheduleSummary({
 function SliderRow({
   spec,
   value,
-  onChange
+  onChange,
+  helper
 }: {
   spec: SliderSpec;
   value: number;
   onChange: (next: number) => void;
+  // Optional muted line below the min/max labels. Useful for sliders whose
+  // raw value (e.g. an absolute calendar year) benefits from a relative
+  // contextualization ("in 12 years").
+  helper?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -665,6 +741,9 @@ function SliderRow({
         <span>{spec.format(spec.min)}</span>
         <span>{spec.format(spec.max)}</span>
       </div>
+      {helper ? (
+        <div className="text-[11px] text-[var(--ink-muted)]">{helper}</div>
+      ) : null}
     </div>
   );
 }

@@ -43,7 +43,12 @@ export const PlanInputsSchema = z.object({
   primaryResidenceValue: z.number().finite().nonnegative(),
   otherPropertyValue: z.number().finite().nonnegative(),
   primaryResidenceRate: z.number().finite().min(MIN_APPRECIATION).max(MAX_APPRECIATION),
-  otherPropertyRate: z.number().finite().min(MIN_APPRECIATION).max(MAX_APPRECIATION)
+  otherPropertyRate: z.number().finite().min(MIN_APPRECIATION).max(MAX_APPRECIATION),
+  // Year at which each non-liquid asset is expected to become liquid; on
+  // that year the projection moves the asset's value into the liquid
+  // portfolio so it begins compounding at the expected return.
+  nonLiquidLiquidityYear: z.number().int(),
+  otherFixedLiquidityYear: z.number().int()
 });
 
 export type PlanInputs = z.infer<typeof PlanInputsSchema>;
@@ -101,5 +106,7 @@ export const DEFAULT_PLAN_INPUTS: PlanInputs = {
   primaryResidenceValue: 0,
   otherPropertyValue: 0,
   primaryResidenceRate: DEFAULT_RATE,
-  otherPropertyRate: DEFAULT_RATE
+  otherPropertyRate: DEFAULT_RATE,
+  nonLiquidLiquidityYear: new Date().getFullYear(),
+  otherFixedLiquidityYear: new Date().getFullYear()
 };

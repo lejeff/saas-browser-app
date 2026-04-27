@@ -88,9 +88,21 @@ export function computeOverTimeAnnualPayment(P: number, r: number, n: number): n
 export function projectNetWorth(input: PlanInputs, now: Date = new Date()): ProjectionPoint[] {
   const currentAge = ageFromDob(input.dateOfBirth, now);
   const years = clampHorizon(input.horizonYears);
-  const nonLiquid = input.nonLiquidInvestments;
-  const otherFixed = input.otherFixedAssets;
   const startYear = now.getFullYear();
+
+  // Non-liquid assets transfer into the liquid portfolio at their
+  // configured liquidity year. If the liquidity year is at or before the
+  // projection start, we treat them as already liquid at year 0 (mirrors
+  // the same convention used for `debtEndYear <= startYear`). Once
+  // transferred, the value compounds at `nominalReturn` from then on.
+  let nonLiquid =
+    input.nonLiquidLiquidityYear > startYear ? input.nonLiquidInvestments : 0;
+  let otherFixed =
+    input.otherFixedLiquidityYear > startYear ? input.otherFixedAssets : 0;
+  const nonLiquidStartInLiquid =
+    input.nonLiquidLiquidityYear <= startYear ? input.nonLiquidInvestments : 0;
+  const otherFixedStartInLiquid =
+    input.otherFixedLiquidityYear <= startYear ? input.otherFixedAssets : 0;
 
   // Debt is modeled as a fixed-rate loan with a `currently outstanding`
   // balance entered as `startDebt`. Payments are nominal (the loan contract
@@ -106,7 +118,7 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
   // settled from year 0; otherwise we carry the entered balance forward.
   let debtBalance = remainingTerm > 0 && input.startDebt > 0 ? input.startDebt : 0;
 
-  let assets = input.startAssets;
+  let assets = input.startAssets + nonLiquidStartInLiquid + otherFixedStartInLiquid;
   let cash = input.cashBalance;
   let residence = input.primaryResidenceValue;
   let otherProp = input.otherPropertyValue;
@@ -172,6 +184,18 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // The amount is entered in today's money, so inflate it to the landing year.
       if (startYear + i === input.windfallYear && input.windfallAmount > 0) {
         assets += input.windfallAmount * inflator;
+      }
+
+      // Non-liquid assets become liquid at their configured year. Transfer
+      // the entered nominal value (no inflator — non-liquid assets are
+      // held statically, matching how they accumulate before this point).
+      if (startYear + i === input.nonLiquidLiquidityYear && nonLiquid > 0) {
+        assets += nonLiquid;
+        nonLiquid = 0;
+      }
+      if (startYear + i === input.otherFixedLiquidityYear && otherFixed > 0) {
+        assets += otherFixed;
+        otherFixed = 0;
       }
     }
 
