@@ -49,7 +49,13 @@ const BASE_INPUTS: PlanInputs = {
   primaryResidenceValue: 0,
   otherPropertyValue: 0,
   primaryResidenceRate: 0,
-  otherPropertyRate: 0
+  otherPropertyRate: 0,
+  // Both default to 2200 so non-liquid balances stay non-liquid throughout
+  // the projection horizon and tests that don't care about liquidity timing
+  // keep their original behavior. Tests that DO exercise the transfer
+  // override these fields explicitly.
+  nonLiquidLiquidityYear: 2200,
+  otherFixedLiquidityYear: 2200
 };
 
 describe("ageFromDob", () => {
@@ -1161,6 +1167,179 @@ describe("projectNetWorth bucket fields", () => {
     for (const p of points) {
       expect(p.otherAssets).toBe(100_000);
       expect(p.debt).toBe(60_000);
+    }
+  });
+});
+
+describe("projectNetWorth — non-liquid liquidity year", () => {
+  // Strip flows down so changes in liquid (`savings`) come purely from the
+  // liquidity transfer + portfolio compounding, never from salary/spend.
+  const startYear = FIXED_NOW.getFullYear();
+  const quietBase: PlanInputs = {
+    ...BASE_INPUTS,
+    startAssets: 0,
+    cashBalance: 0,
+    annualIncome: 0,
+    monthlySpending: 0,
+    rentalIncome: 0,
+    inflationRate: 0
+  };
+
+  it("keeps the value in otherAssets and lets liquid compound separately before the liquidity year", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 100_000,
+        nominalReturn: 0.05,
+        nonLiquidInvestments: 50_000,
+        nonLiquidLiquidityYear: startYear + 5
+      },
+      FIXED_NOW
+    );
+    // Years 0..4 are strictly before the transfer.
+    for (let i = 0; i < 5; i += 1) {
+      expect(points[i].otherAssets).toBe(50_000);
+      money(points[i].savings, 100_000 * 1.05 ** i, 0.5);
+    }
+  });
+
+  it("transfers the value into liquid at the liquidity year and compounds it from the next year", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 0,
+        nominalReturn: 0.05,
+        nonLiquidInvestments: 50_000,
+        nonLiquidLiquidityYear: startYear + 3
+      },
+      FIXED_NOW
+    );
+    // Year 2 — still non-liquid.
+    expect(points[2].otherAssets).toBe(50_000);
+    money(points[2].savings, 0, 0.01);
+    // Year 3 — transfer happens at year-end, mirroring the windfall convention:
+    // the transferred amount lands in `assets` after that year's compounding,
+    // so savings == the entered nominal value and otherAssets is drained.
+    expect(points[3].otherAssets).toBe(0);
+    money(points[3].savings, 50_000, 0.01);
+    // Year 4 — compounds for the first time.
+    money(points[4].savings, 50_000 * 1.05, 0.5);
+    // Year 5 — keeps compounding.
+    money(points[5].savings, 50_000 * 1.05 ** 2, 0.5);
+  });
+
+  it("treats nonLiquidLiquidityYear at-or-before the start year as already liquid at year 0", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 0,
+        nominalReturn: 0.05,
+        nonLiquidInvestments: 80_000,
+        nonLiquidLiquidityYear: startYear // exactly at start
+      },
+      FIXED_NOW
+    );
+    // Already moved at year 0; compounds from year 1 onward.
+    expect(points[0].otherAssets).toBe(0);
+    money(points[0].savings, 80_000, 0.01);
+    money(points[1].savings, 80_000 * 1.05, 0.5);
+    money(points[5].savings, 80_000 * 1.05 ** 5, 0.5);
+  });
+
+  it("also treats a liquidity year strictly before the start year as already liquid", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 0,
+        nominalReturn: 0.05,
+        nonLiquidInvestments: 80_000,
+        nonLiquidLiquidityYear: startYear - 5 // already past
+      },
+      FIXED_NOW
+    );
+    expect(points[0].otherAssets).toBe(0);
+    money(points[0].savings, 80_000, 0.01);
+    money(points[1].savings, 80_000 * 1.05, 0.5);
+  });
+
+  it("leaves the asset non-liquid for the entire horizon when the liquidity year is past it", () => {
+    const horizon = 30;
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        horizonYears: horizon,
+        startAssets: 0,
+        nominalReturn: 0.05,
+        nonLiquidInvestments: 50_000,
+        nonLiquidLiquidityYear: startYear + horizon + 100
+      },
+      FIXED_NOW
+    );
+    for (const p of points) {
+      expect(p.otherAssets).toBe(50_000);
+      money(p.savings, 0, 0.01);
+    }
+  });
+
+  it("transfers the two non-liquid buckets at independent years", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 0,
+        nominalReturn: 0,
+        nonLiquidInvestments: 30_000,
+        otherFixedAssets: 20_000,
+        nonLiquidLiquidityYear: startYear + 2,
+        otherFixedLiquidityYear: startYear + 5
+      },
+      FIXED_NOW
+    );
+    // Year 1 — both still non-liquid.
+    expect(points[1].otherAssets).toBe(50_000);
+    money(points[1].savings, 0, 0.01);
+    // Year 2 — non-liquid bucket lands in liquid.
+    expect(points[2].otherAssets).toBe(20_000);
+    money(points[2].savings, 30_000, 0.01);
+    // Years 3..4 — only non-liquid has transferred, otherFixed still pending.
+    expect(points[3].otherAssets).toBe(20_000);
+    money(points[3].savings, 30_000, 0.01);
+    expect(points[4].otherAssets).toBe(20_000);
+    money(points[4].savings, 30_000, 0.01);
+    // Year 5 — otherFixed lands too. With nominalReturn=0 the first deposit
+    // does not grow, so liquid simply holds the sum of both transfers.
+    expect(points[5].otherAssets).toBe(0);
+    money(points[5].savings, 50_000, 0.01);
+  });
+
+  it("preserves total net worth at the moment of transfer (a value just moves between buckets)", () => {
+    const points = projectNetWorth(
+      {
+        ...quietBase,
+        startAssets: 0,
+        nominalReturn: 0,
+        nonLiquidInvestments: 40_000,
+        nonLiquidLiquidityYear: startYear + 3
+      },
+      FIXED_NOW
+    );
+    // With zero return and zero flows, every year's net worth equals the
+    // initial 40k regardless of which bucket holds it.
+    for (const p of points) {
+      money(p.netWorth, 40_000, 0.01);
+    }
+  });
+
+  it("does not change behavior on the default plan (defaults are past horizon)", () => {
+    const baseline = projectNetWorth(
+      {
+        ...BASE_INPUTS,
+        nonLiquidInvestments: 50_000,
+        otherFixedAssets: 25_000
+      },
+      FIXED_NOW
+    );
+    for (const p of baseline) {
+      expect(p.otherAssets).toBe(75_000);
     }
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlannerForm } from "./PlannerForm";
@@ -325,5 +325,53 @@ describe("PlannerForm layout", () => {
     // The reset control should not be tucked inside any of the category
     // fieldsets; it lives in the form's header row.
     expect(btn.closest("fieldset")).toBeNull();
+  });
+
+  it("renders a Liquidity year slider after each Non-Liquid amount field with a 'this year' helper at the default", async () => {
+    render(<Host />);
+    await expand(/non-liquid/i);
+    const nonLiquid = screen.getByTestId("subsection-non-liquid");
+    // One slider per non-liquid bucket (Private Equity + Other Fixed Assets).
+    expect(within(nonLiquid).getAllByText("Liquidity year")).toHaveLength(2);
+    // Defaults to the current year, so the helper reads "this year" twice.
+    expect(within(nonLiquid).getAllByText("this year")).toHaveLength(2);
+  });
+
+  it("updates the Liquidity year value display and helper when the slider moves", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/non-liquid/i);
+    const nonLiquid = screen.getByTestId("subsection-non-liquid");
+
+    // Seed a non-zero principal so the slider has something to liquidate. The
+    // value isn't asserted; this just exercises the realistic flow.
+    const pe = within(nonLiquid).getByLabelText("Private Equity") as HTMLInputElement;
+    await user.clear(pe);
+    await user.type(pe, "100000");
+
+    // The Non-Liquid subsection has two sliders in DOM order: the first is
+    // nonLiquidLiquidityYear (paired with Private Equity), the second is
+    // otherFixedLiquidityYear. Drive the first one to currentYear + 12.
+    const sliders = within(nonLiquid).getAllByRole("slider");
+    expect(sliders).toHaveLength(2);
+    const currentYear = new Date().getFullYear();
+    const targetYear = currentYear + 12;
+    fireEvent.change(sliders[0], { target: { value: String(targetYear) } });
+
+    // Raw-year display reads the new year, and the helper reads "in N years".
+    expect(within(nonLiquid).getByText(String(targetYear))).toBeInTheDocument();
+    expect(within(nonLiquid).getByText("in 12 years")).toBeInTheDocument();
+    // The other slider stays at its default helper, so "this year" still shows once.
+    expect(within(nonLiquid).getAllByText("this year")).toHaveLength(1);
+  });
+
+  it("uses singular 'in 1 year' when the slider is one year out", async () => {
+    render(<Host />);
+    await expand(/non-liquid/i);
+    const nonLiquid = screen.getByTestId("subsection-non-liquid");
+    const sliders = within(nonLiquid).getAllByRole("slider");
+    const currentYear = new Date().getFullYear();
+    fireEvent.change(sliders[0], { target: { value: String(currentYear + 1) } });
+    expect(within(nonLiquid).getByText("in 1 year")).toBeInTheDocument();
   });
 });
