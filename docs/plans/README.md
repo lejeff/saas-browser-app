@@ -5,7 +5,7 @@ Filenames are prefixed with the date the plan was created.
 
 > For the current roadmap of upcoming work, see [`ROADMAP.md`](../../ROADMAP.md) at the repo root.
 
-**31 plans** across 6 days.
+**32 plans** across 6 days.
 
 ## 2026-04-22
 
@@ -55,3 +55,4 @@ Filenames are prefixed with the date the plan was created.
 - [Collapsible Real Estate holdings](./2026-04-29-collapsible-real-estate-holdings.md) — Migrate `RealEstateHoldingCard` to render via the shared `CollapsibleSubsection` (`CollapsiblePill`), discarding its hand-rolled `<fieldset>`/`<legend>`/border code. Newly-added holdings auto-expand; loaded ones default collapsed and show a one-line summary combining current value and (when non-zero) annual rental income.
 - [Assets & Debt summary: include expected return](./2026-04-29-assets-debt-return-summary.md) — Append the Expected annual return rate to the Assets & Debt collapsed-pill summary so it reads `Net $X · 5.0% return on Portfolio`, reusing the existing percent formatter and middle-dot separator conventions.
 - [Liquid sub-pill summary: include expected return](./2026-04-29-liquid-subpill-return-summary.md) — Mirror the new "X.X% return on Portfolio" suffix into the Liquid sub-pill's collapsed summary so the rate stays visible when only the Liquid sub-pill is closed (parent pill open). Em-dash kept as the no-balance placeholder; rate always present.
+- [Click-to-expand pill](./2026-04-29-click-to-expand-pill.md) — Make clicking anywhere on a collapsed pill (parent category, sub-pill, life-event card, or Real Estate holding) open it. One-way: clicks inside an open pill never collapse it, so nested children retain their independent open/closed state and clicks bubbling up from inputs / sliders / sub-pills never accidentally close the parent.
