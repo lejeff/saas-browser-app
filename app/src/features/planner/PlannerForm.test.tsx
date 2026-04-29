@@ -3,7 +3,11 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlannerForm } from "./PlannerForm";
-import { DEFAULT_PLAN_INPUTS, type PlanInputs } from "@app/core";
+import {
+  DEFAULT_PLAN_INPUTS,
+  makeDefaultRealEstateHolding,
+  type PlanInputs
+} from "@app/core";
 import { CurrencyProvider } from "@/features/currency/CurrencyContext";
 
 function Host({ onReset = vi.fn() }: { onReset?: () => void } = {}) {
@@ -48,14 +52,15 @@ describe("PlannerForm layout", () => {
     render(<Host />);
     const assets = screen.getByText("Assets and Debt").closest("fieldset")!;
 
-    // Liquid is open by default.
+    // All three sub-pills (Liquid, Non-Liquid, Debt) start collapsed —
+    // expand each to inspect its inner fields.
+    await expand(/^Liquid$/i);
     const liquid = within(assets).getByTestId("subsection-liquid");
     expect(within(liquid).getByText("Liquid")).toBeInTheDocument();
     expect(within(liquid).getByLabelText("Financial Assets / Portfolio")).toBeInTheDocument();
     expect(within(liquid).getByLabelText("Cash Balance")).toBeInTheDocument();
     expect(within(liquid).getByText("Expected annual return")).toBeInTheDocument();
 
-    // Non-Liquid and Debt start collapsed — expand to inspect their fields.
     await expand(/non-liquid/i);
     const nonLiquid = within(assets).getByTestId("subsection-non-liquid");
     expect(within(nonLiquid).getByText("Non-Liquid")).toBeInTheDocument();
@@ -73,6 +78,72 @@ describe("PlannerForm layout", () => {
     expect(liquid.tagName).toBe("FIELDSET");
     expect(nonLiquid.tagName).toBe("FIELDSET");
     expect(debt.tagName).toBe("FIELDSET");
+  });
+
+  it("Liquid subsection shows a formatted total (startAssets + cashBalance) in its collapsed-state summary", () => {
+    render(<Host />);
+    // Liquid defaults to closed (matches Non-Liquid + Debt), so the
+    // summary is visible immediately. DEFAULT_PLAN_INPUTS has
+    // startAssets=10_000 and cashBalance=0, so the formatted total
+    // should contain "10,000".
+    const summary = screen.getByTestId("subsection-liquid-summary");
+    expect(summary.textContent).toMatch(/10,000/);
+    // Sanity-check it's not the em-dash empty fallback.
+    expect(summary.textContent).not.toBe("—");
+  });
+
+  it("Non-Liquid subsection shows an em-dash in its collapsed-state summary when both buckets are zero (default fixture)", async () => {
+    render(<Host />);
+    // Non-Liquid defaults to closed and DEFAULT_PLAN_INPUTS has both
+    // nonLiquidInvestments and otherFixedAssets at 0.
+    const summary = screen.getByTestId("subsection-non-liquid-summary");
+    expect(summary.textContent).toBe("—");
+  });
+
+  it("Debt subsection's default-state summary is two lines: em-dash headline and 'No outstanding debt.'", async () => {
+    render(<Host />);
+    // Debt defaults to closed; the collapsed summary is visible immediately.
+    const summary = screen.getByTestId("subsection-debt-summary");
+    const lines = Array.from(summary.querySelectorAll("div"));
+    expect(lines).toHaveLength(2);
+    // Line 1: empty-bucket fallback, since startDebt defaults to 0.
+    expect(lines[0]!.textContent).toBe("—");
+    // Line 2: existing-debt edge-case wording (NOT the new-debt wording
+    // "No principal entered.") — verifies the per-call `messages`
+    // override on the shared `formatDebtScheduleText` helper.
+    expect(lines[1]!.textContent).toBe("No outstanding debt.");
+  });
+
+  it("Debt subsection's collapsed summary surfaces the same schedule text as the in-card paragraph once a principal is entered", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    // Expand Debt to type into the Debt amount input. The input label
+    // collides with the subsection title, so scope by testid.
+    await user.click(screen.getByRole("button", { name: /^Debt$/i }));
+    const debt = screen.getByTestId("subsection-debt");
+    const debtAmount = within(debt).getByLabelText("Debt") as HTMLInputElement;
+    await user.clear(debtAmount);
+    await user.type(debtAmount, "100000");
+    await user.tab();
+
+    // Capture the in-card paragraph text BEFORE collapsing — both lines
+    // should agree byte-for-byte (the contract `formatDebtScheduleText`
+    // enforces).
+    const inCardSchedule = within(debt).getByTestId(
+      "debt-schedule-summary"
+    ).textContent!;
+    expect(inCardSchedule).toMatch(/Annual repayment|Annual interest/);
+
+    // Collapse Debt to inspect the collapsed summary.
+    await user.click(screen.getByRole("button", { name: /^Debt$/i }));
+    const summary = screen.getByTestId("subsection-debt-summary");
+    const lines = Array.from(summary.querySelectorAll("div"));
+    expect(lines).toHaveLength(2);
+    // Line 1: balance only (no "from <year>" — your spec). Locale
+    // formatting varies, assert a substring of 100,000.
+    expect(lines[0]!.textContent).toMatch(/100/);
+    // Line 2: identical to the in-card paragraph.
+    expect(lines[1]!.textContent).toBe(inCardSchedule);
   });
 
   it("renders the Debt subsection with the coral (debt-lane) accent, distinct from the teal Liquid/Non-Liquid lanes", async () => {
@@ -105,6 +176,24 @@ describe("PlannerForm layout", () => {
     ).toBeNull();
   });
 
+  it("shows the annualised total below Recurring monthly expenses and updates as the user types", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/income & expenses/i);
+    const fs = screen.getByText("Income & Expenses").closest("fieldset")!;
+
+    // Default state: monthlySpending is 0 -> annual total is 0.
+    expect(within(fs).getByText("Annual total: €0")).toBeInTheDocument();
+
+    // Typing 5000 into the field should drive the helper to 12 * 5000.
+    const monthly = within(fs).getByLabelText(
+      "Recurring monthly expenses"
+    ) as HTMLInputElement;
+    await user.clear(monthly);
+    await user.type(monthly, "5000");
+    expect(within(fs).getByText("Annual total: €60,000")).toBeInTheDocument();
+  });
+
   it("renders an empty Life Events category with all three Add buttons by default", async () => {
     render(<Host />);
     await expand(/life events/i);
@@ -126,6 +215,81 @@ describe("PlannerForm layout", () => {
     expect(
       within(fs).getByRole("button", { name: /^\+ add new debt$/i })
     ).toBeInTheDocument();
+  });
+
+  it("renders sub-pill chevrons in the top-right corner (matching the parent pill pattern), not inline next to the title", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+
+    // Add a Windfall card so we have a sub-pill (size=\"sm\") to inspect.
+    await user.click(
+      within(screen.getByText("Life Events").closest("fieldset")!).getByRole(
+        "button",
+        { name: /^\+ add windfall$/i }
+      )
+    );
+    const card = screen.getByTestId("windfall-card-0");
+
+    // The sub-pill should expose two buttons that toggle: the legend
+    // button (carrying the title as accessible name) and a decorative
+    // top-right chevron button (aria-hidden + tabIndex=-1). The legend
+    // button has NO chevron sibling inside it anymore.
+    const legendButton = within(card).getByRole("button", {
+      name: /^Windfall 1$/i
+    });
+    expect(legendButton.querySelector("svg")).toBeNull();
+
+    // The top-right chevron is aria-hidden and intentionally NOT
+    // discoverable via getByRole; query the DOM directly. It must
+    // contain the chevron SVG and use the same top-right positioning
+    // pattern as the parent pill (`absolute right-3 top-[-9px|-10px]`).
+    // Sub-pills are nudged 1px down (top-[-9px]) so the smaller chevron
+    // sits visually centered on the pill's top border; parent pills use
+    // top-[-10px] for the larger chevron.
+    const decorativeButtons = Array.from(
+      card.querySelectorAll('button[aria-hidden="true"]')
+    );
+    expect(decorativeButtons).toHaveLength(1);
+    const chevronButton = decorativeButtons[0]!;
+    expect(chevronButton.className).toContain("absolute");
+    expect(chevronButton.className).toContain("right-3");
+    expect(chevronButton.className).toContain("top-[-9px]");
+    expect(chevronButton.getAttribute("tabIndex")).toBe("-1");
+    expect(chevronButton.querySelector("svg")).not.toBeNull();
+  });
+
+  it("auto-expands a freshly-added life-event card and shows a one-line summary on collapsed cards", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+
+    // Click +Add Windfall. The card should mount EXPANDED (newly-added,
+    // tracked in PlannerForm's local newlyAddedIds) so the user can fill
+    // it in immediately — no extra click-to-expand needed.
+    const lifeEvents = screen.getByText("Life Events").closest("fieldset")!;
+    await user.click(
+      within(lifeEvents).getByRole("button", { name: /^\+ add windfall$/i })
+    );
+    const card = screen.getByTestId("windfall-card-0");
+    expect(within(card).getByLabelText("Amount")).toBeInTheDocument();
+    // No collapsed-state summary visible while expanded.
+    expect(
+      within(card).queryByTestId("windfall-card-0-summary")
+    ).toBeNull();
+
+    // Collapse the card via its legend toggle. Fields disappear and a
+    // single-line summary appears in their place. Default amount is 0,
+    // so the summary falls back to "Year <year>" rather than "€0 in ...".
+    // Match exactly "Windfall 1" (anchored) so we don't catch the
+    // sibling "Remove windfall 1" button.
+    await user.click(
+      within(card).getByRole("button", { name: /^Windfall 1$/i })
+    );
+    expect(within(card).queryByLabelText("Amount")).toBeNull();
+    const summary = within(card).getByTestId("windfall-card-0-summary");
+    expect(summary).toBeInTheDocument();
+    expect(summary.textContent).toMatch(/^Year \d{4}$/);
   });
 
   it("does not render windfall fields anywhere by default", async () => {
@@ -185,6 +349,8 @@ describe("PlannerForm layout", () => {
   it("updates the Cash Balance field when the user types", async () => {
     const user = userEvent.setup();
     render(<Host />);
+    // Liquid sub-pill is collapsed by default; expand to reach Cash Balance.
+    await expand(/^Liquid$/i);
     const field = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(field);
     await user.type(field, "75000");
@@ -238,11 +404,13 @@ describe("PlannerForm layout", () => {
     );
   });
 
-  it("starts with Liquid open and Non-Liquid / Debt closed inside Assets and Debt", () => {
+  it("starts with all three Assets & Debt sub-pills (Liquid / Non-Liquid / Debt) collapsed by default", () => {
     render(<Host />);
+    // All three sub-pills now match the Non-Liquid pattern: collapsed
+    // by default, click the legend toggle to expand.
     expect(screen.getByRole("button", { name: /^liquid$/i })).toHaveAttribute(
       "aria-expanded",
-      "true"
+      "false"
     );
     expect(screen.getByRole("button", { name: /non-liquid/i })).toHaveAttribute(
       "aria-expanded",
@@ -340,7 +508,10 @@ describe("PlannerForm layout", () => {
       screen.getByText(/.{1,3}0\/yr income · .{1,3}0\/mo expenses/)
     ).toBeInTheDocument();
     // Real estate summary is the em-dash placeholder when both values are 0.
-    expect(screen.getByText("\u2014")).toBeInTheDocument();
+    // Scope to the Real Estate category fieldset since other empty
+    // sub-pill summaries (Non-Liquid, Debt headline) also use em-dash.
+    const realEstate = screen.getByText("Real Estate").closest("fieldset")!;
+    expect(within(realEstate).getByText("\u2014")).toBeInTheDocument();
     expect(screen.getByText("None scheduled")).toBeInTheDocument();
     expect(screen.getByText(/Inflation 2\.0%/)).toBeInTheDocument();
   });
@@ -905,8 +1076,10 @@ describe("Real estate holdings", () => {
     const user = userEvent.setup();
     render(<Host />);
     // Default: empty holdings → em-dash placeholder shown next to the
-    // collapsed Real Estate header.
-    expect(screen.getByText("\u2014")).toBeInTheDocument();
+    // collapsed Real Estate header. Scope to the Real Estate fieldset
+    // since other empty sub-pill summaries also use em-dash.
+    const realEstate = screen.getByText("Real Estate").closest("fieldset")!;
+    expect(within(realEstate).getByText("\u2014")).toBeInTheDocument();
 
     await expand(/real estate/i);
     await user.click(
@@ -922,8 +1095,90 @@ describe("Real estate holdings", () => {
     // present, "real estate" matches the Add and Remove buttons too — pin
     // the regex to the category header's exact accessible name.
     await user.click(screen.getByRole("button", { name: /^real estate$/i }));
-    expect(screen.queryByText("\u2014")).toBeNull();
+    expect(within(realEstate).queryByText("\u2014")).toBeNull();
     expect(screen.getByText(/450K/)).toBeInTheDocument();
+  });
+
+  // Regression for the migration to CollapsiblePill: each holding card
+  // is now itself a sub-pill that mounts EXPANDED on +Add (newly-added
+  // ID is tracked in PlannerForm's local set) and collapses to a single
+  // summary line combining current value and annual rental income.
+  it("auto-expands a freshly-added holding and shows the value \u00b7 rent summary on collapse", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/real estate/i);
+    await user.click(
+      screen.getByRole("button", { name: /^\+ add real estate$/i })
+    );
+    const card = screen.getByTestId("re-holding-card-0");
+    // Card mounts expanded: inner fields are visible immediately and no
+    // collapsed-state summary is rendered.
+    expect(within(card).getByLabelText("Value")).toBeInTheDocument();
+    expect(within(card).queryByTestId("re-holding-card-0-summary")).toBeNull();
+
+    // Fill in both a value and an annual rental income so the joined
+    // form of the summary ("value \u00b7 rent/yr") fires.
+    const valueField = within(card).getByLabelText("Value") as HTMLInputElement;
+    await user.clear(valueField);
+    await user.type(valueField, "450000");
+    await user.tab();
+    const rentField = within(card).getByLabelText(
+      "Annual rental income"
+    ) as HTMLInputElement;
+    await user.clear(rentField);
+    await user.type(rentField, "12000");
+    await user.tab();
+
+    // Collapse via the legend toggle. Anchor the regex to "Real Estate 1"
+    // so we don't catch the sibling Remove button or the parent category
+    // header.
+    await user.click(within(card).getByRole("button", { name: /^Real Estate 1$/i }));
+    expect(within(card).queryByLabelText("Value")).toBeNull();
+    const summary = within(card).getByTestId("re-holding-card-0-summary");
+    expect(summary.textContent).toMatch(/450,000/);
+    expect(summary.textContent).toMatch(/12,000 rent\/yr/);
+    expect(summary.textContent).toContain("\u00b7");
+
+    // Re-expand to confirm the toggle round-trips and the fields return
+    // with the values we typed in still preserved.
+    await user.click(within(card).getByRole("button", { name: /^Real Estate 1$/i }));
+    const reopenedValue = within(card).getByLabelText("Value") as HTMLInputElement;
+    expect(reopenedValue.value).toBe("450,000");
+  });
+
+  // Loaded holdings (page reload, hydrated from storage, anything that
+  // wasn't added during this PlannerForm mount) default to COLLAPSED so
+  // the form doesn't dump every saved property's fields on the user.
+  it("loaded holdings default to collapsed and show the value-only summary when rent is 0", async () => {
+    const seeded: PlanInputs = {
+      ...DEFAULT_PLAN_INPUTS,
+      realEstateHoldings: [
+        {
+          ...makeDefaultRealEstateHolding(),
+          value: 600000,
+          annualRentalIncome: 0
+        }
+      ]
+    };
+    function SeededHost() {
+      const [v, setV] = useState<PlanInputs>(seeded);
+      return (
+        <CurrencyProvider>
+          <PlannerForm value={v} onChange={setV} onReset={vi.fn()} />
+        </CurrencyProvider>
+      );
+    }
+    render(<SeededHost />);
+    await expand(/real estate/i);
+    const card = screen.getByTestId("re-holding-card-0");
+    // Card is collapsed: inner fields hidden, summary present and
+    // showing the value-only form (no " \u00b7 rent/yr" suffix because
+    // annualRentalIncome is 0).
+    expect(within(card).queryByLabelText("Value")).toBeNull();
+    const summary = within(card).getByTestId("re-holding-card-0-summary");
+    expect(summary.textContent).toMatch(/600,000/);
+    expect(summary.textContent).not.toContain("rent/yr");
+    expect(summary.textContent).not.toContain("\u00b7");
   });
 });
 
@@ -1059,6 +1314,79 @@ describe("New debt events", () => {
     await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
     const card = screen.getByTestId("new-debt-card-0");
     expect(within(card).getByText("in 5 years")).toBeInTheDocument();
+  });
+
+  it("renders a two-line collapsed summary on the New Debt card: headline (inflated principal + start year) on top, schedule helper line below", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    const principal = within(card).getByLabelText("Principal") as HTMLInputElement;
+    await user.clear(principal);
+    await user.type(principal, "100000");
+    await user.tab();
+
+    // Capture the in-card schedule helper text BEFORE collapsing — we'll
+    // assert the collapsed summary surfaces the same string verbatim,
+    // which is the contract `formatNewDebtScheduleText` enforces.
+    const inCardSchedule = within(card).getByTestId(
+      "new-debt-schedule-summary-0"
+    ).textContent!;
+    expect(inCardSchedule).toMatch(/Annual repayment/);
+
+    // Collapse via the legend toggle (anchored regex to avoid catching
+    // the sibling "Remove new debt 1" button).
+    await user.click(
+      within(card).getByRole("button", { name: /^New Debt 1$/i })
+    );
+
+    const summary = within(card).getByTestId("new-debt-card-0-summary");
+    // Two lines: headline div + schedule div.
+    const lines = Array.from(summary.querySelectorAll("div"));
+    expect(lines).toHaveLength(2);
+    // Line 1: headline. With default inflateAmount=true, principal=100K
+    // and startYear = currentYear+5 at 2% inflation, the displayed
+    // amount lands around €110,408. Assert the year format and a "11"
+    // substring (matches "110,408" / "€110.4K" etc.) instead of "100"
+    // so we lock in that the headline tracks the inflated value.
+    expect(lines[0]!.textContent).toMatch(/from \d{4}/);
+    expect(lines[0]!.textContent).toMatch(/11/);
+    expect(lines[0]!.textContent).not.toMatch(/100,000|100000/);
+    // Line 2: identical to the in-card schedule paragraph.
+    expect(lines[1]!.textContent).toBe(inCardSchedule);
+  });
+
+  it("collapsed New Debt headline drops back to the entered face value when 'Adjust amount for inflation' is unchecked", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    const principal = within(card).getByLabelText("Principal") as HTMLInputElement;
+    await user.clear(principal);
+    await user.type(principal, "100000");
+    await user.tab();
+
+    // Toggle inflateAmount OFF — face value should now flow through to
+    // both the in-card helper AND the collapsed summary headline.
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(new debt 1\)/i
+    ) as HTMLInputElement;
+    await user.click(toggle);
+    expect(toggle.checked).toBe(false);
+
+    // Collapse and inspect the headline.
+    await user.click(
+      within(card).getByRole("button", { name: /^New Debt 1$/i })
+    );
+    const summary = within(card).getByTestId("new-debt-card-0-summary");
+    const lines = Array.from(summary.querySelectorAll("div"));
+    expect(lines).toHaveLength(2);
+    // Headline now shows the raw entered amount (100,000), not the
+    // inflated 110K.
+    expect(lines[0]!.textContent).toMatch(/100/);
+    expect(lines[0]!.textContent).not.toMatch(/110/);
   });
 });
 

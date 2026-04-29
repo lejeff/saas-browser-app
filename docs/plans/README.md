@@ -5,7 +5,7 @@ Filenames are prefixed with the date the plan was created.
 
 > For the current roadmap of upcoming work, see [`ROADMAP.md`](../../ROADMAP.md) at the repo root.
 
-**25 plans** across 5 days.
+**29 plans** across 6 days.
 
 ## 2026-04-22
 
@@ -46,3 +46,10 @@ Filenames are prefixed with the date the plan was created.
 - [Real Estate as stackable holdings](./2026-04-28-real-estate-holdings-cards.md) — Replace the two flat Primary Residence / Other Property fields on `PlanInputs` with a single stackable `realEstateHoldings: RealEstateHolding[]` array, mirroring the discriminated-union + add/remove card pattern used by `RealEstateInvestmentEvent` in the Life Events section. Each holding card keeps the existing inputs (value + annual appreciation rate) and stays inside the Real Estate form category; `events` is untouched.
 - [Windfalls as life events](./2026-04-28-windfalls-as-life-events.md) — Convert the single `windfallAmount` / `windfallYear` scalars into a stackable `WindfallEvent` variant inside the existing `LifeEvent` discriminated union, with an `+ Add Windfall` button and zero windfalls by default. Mirrors the Real Estate Investment card pattern (including the inflation-adjusted future-value helper text), and rides the existing storage union round-trip with no `storage.ts` changes.
 - [Life events feature wave](./2026-04-28-life-events-feature-wave.md) — Six sequential tasks polishing the Life Events section and adjacent categories: per-holding rental income, dropping the global rental fields, a New Debt life event variant, color-coding life-event cards by destination category, full-pill borders on the Assets & Debt subsections, and an `Adjust amount for inflation` toggle on every life-event card.
+
+## 2026-04-29
+
+- [Collapsible pill refactor](./2026-04-29-collapsible-pill-refactor.md) — Refine the first task of the collapsible-cards wave: bump the collapsed child-pill summary font to match the parent, enrich the New Debt collapsed summary with the schedule helper line (two-line summary), and unify `CollapsibleCategory` + `CollapsibleSubsection` into a single shared `CollapsiblePill` so every sub-pill in the form goes through one component.
+- [Subsection summaries](./2026-04-29-subsection-summaries.md) — Add collapsed-state summaries to the Liquid, Non-Liquid, and Debt sub-pills inside Assets & Debt. Liquid and Non-Liquid get a single-line total; Debt gets a two-line summary matching the New Debt life-event card format (headline = balance only, no start year, plus the schedule helper line). Extract a shared schedule-text formatter so the in-card paragraph and both collapsed summaries stay in lock-step. Liquid also flips to default-collapsed.
+- [Sub-pill chevron in the top-right](./2026-04-29-sub-pill-chevron-top-right.md) — Move the chevron toggle on every `CollapsibleSubsection` / life-event card from inline-next-to-title to the top-right corner, matching `CollapsibleCategory` exactly. Sub-pills keep the smaller 12px chevron, nudged 1px down so it sits visually centered on the pill border.
+- [Collapsible Real Estate holdings](./2026-04-29-collapsible-real-estate-holdings.md) — Migrate `RealEstateHoldingCard` to render via the shared `CollapsibleSubsection` (`CollapsiblePill`), discarding its hand-rolled `<fieldset>`/`<legend>`/border code. Newly-added holdings auto-expand; loaded ones default collapsed and show a one-line summary combining current value and (when non-zero) annual rental income.
