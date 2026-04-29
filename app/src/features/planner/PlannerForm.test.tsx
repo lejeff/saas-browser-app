@@ -1045,3 +1045,185 @@ describe("New debt events", () => {
     expect(within(card).getByText("in 5 years")).toBeInTheDocument();
   });
 });
+
+describe("inflateAmount toggle", () => {
+  // The "Adjust amount for inflation" checkbox sits below the Amount /
+  // Principal field on every life-event card. Checked is the historical
+  // default (today's-money input inflated to landing year); unchecking
+  // makes the entered amount land at face value AND drops the
+  // inflation-adjusted preview from the helper line.
+
+  it("renders a checked toggle on a freshly-added Windfall card", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add windfall$/i }));
+    const card = screen.getByTestId("windfall-card-0");
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(windfall 1\)/i
+    ) as HTMLInputElement;
+    expect(toggle.type).toBe("checkbox");
+    expect(toggle.checked).toBe(true);
+  });
+
+  it("renders a checked toggle on a freshly-added Real Estate Investment card", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(
+      screen.getByRole("button", { name: /add real estate investment/i })
+    );
+    const card = screen.getByTestId("re-investment-card-0");
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(real estate investment 1\)/i
+    ) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+  });
+
+  it("renders a checked toggle on a freshly-added New Debt card", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(new debt 1\)/i
+    ) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+  });
+
+  it("swaps the Windfall's Year helper from the inflated preview to the face value when unchecked", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add windfall$/i }));
+    const card = screen.getByTestId("windfall-card-0");
+    const amount = within(card).getByLabelText("Amount") as HTMLInputElement;
+    await user.clear(amount);
+    await user.type(amount, "10000");
+    await user.tab();
+
+    // Default inflation > 0 so the inflated preview shows up while the
+    // toggle stays checked.
+    const yearsToLanding = 5;
+    const inflated = Math.round(
+      10_000 * (1 + DEFAULT_PLAN_INPUTS.inflationRate) ** yearsToLanding
+    );
+    const inflatedFmt = inflated.toLocaleString("en-US");
+    expect(inflatedFmt).not.toBe("10,000"); // sanity-check: non-zero default inflation
+    expect(
+      within(card).getByText(new RegExp(`${inflatedFmt} in ${yearsToLanding} years`))
+    ).toBeInTheDocument();
+
+    // Uncheck → helper should swap to the entered face value paired with
+    // the same relative timing (e.g. "€10,000 in 5 years"). The inflated
+    // figure should disappear from the card.
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(windfall 1\)/i
+    ) as HTMLInputElement;
+    await user.click(toggle);
+    expect(toggle.checked).toBe(false);
+    expect(
+      within(card).getByText(new RegExp(`10,000 in ${yearsToLanding} years`))
+    ).toBeInTheDocument();
+    expect(within(card).queryByText(new RegExp(inflatedFmt))).toBeNull();
+  });
+
+  it("swaps the Real Estate Investment's Purchase year helper from the inflated preview to the face value when unchecked", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(
+      screen.getByRole("button", { name: /add real estate investment/i })
+    );
+    const card = screen.getByTestId("re-investment-card-0");
+    const amount = within(card).getByLabelText(
+      "Purchase amount"
+    ) as HTMLInputElement;
+    await user.clear(amount);
+    await user.type(amount, "1000000");
+    await user.tab();
+
+    const yearsToPurchase = 5; // default purchase year = currentYear + 5
+    const inflated = Math.round(
+      1_000_000 * (1 + DEFAULT_PLAN_INPUTS.inflationRate) ** yearsToPurchase
+    );
+    const inflatedFmt = inflated.toLocaleString("en-US");
+    expect(inflatedFmt).not.toBe("1,000,000"); // sanity-check: non-zero default inflation
+    expect(
+      within(card).getByText(new RegExp(`${inflatedFmt} in ${yearsToPurchase} years`))
+    ).toBeInTheDocument();
+
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(real estate investment 1\)/i
+    ) as HTMLInputElement;
+    await user.click(toggle);
+    expect(toggle.checked).toBe(false);
+    expect(
+      within(card).getByText(new RegExp(`1,000,000 in ${yearsToPurchase} years`))
+    ).toBeInTheDocument();
+    expect(within(card).queryByText(new RegExp(inflatedFmt))).toBeNull();
+  });
+
+  it("swaps the New Debt's Start year helper from the inflated preview to the face value when unchecked", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    const principal = within(card).getByLabelText("Principal") as HTMLInputElement;
+
+    await user.clear(principal);
+    await user.type(principal, "100000");
+    await user.tab();
+
+    // Default startYear = currentYear + 5, default inflation = 2% → 100K *
+    // 1.02^5 ≈ 110,408. Helper surfaces the inflated value while toggle
+    // stays checked.
+    expect(within(card).getByText(/110/)).toBeInTheDocument();
+
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(new debt 1\)/i
+    ) as HTMLInputElement;
+    await user.click(toggle);
+    expect(toggle.checked).toBe(false);
+    // After unchecking, the helper pairs the entered face-value principal
+    // with the same relative timing (e.g. "€100,000 in 5 years") instead
+    // of the inflated preview.
+    expect(within(card).getByText(/100,000 in 5 years/)).toBeInTheDocument();
+    expect(within(card).queryByText(/110,408/)).toBeNull();
+  });
+
+  it("uses the entered principal (not inflated) in the New Debt schedule summary when unchecked", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    const principal = within(card).getByLabelText("Principal") as HTMLInputElement;
+    await user.clear(principal);
+    await user.type(principal, "100000");
+    await user.tab();
+
+    // Default overTime + interest 2% + 5-year window. Inflated principal
+    // (toggle checked) = 100K * 1.02^5 ≈ 110,408 → annual repayment ≈
+    // 23,420. Face-value principal (toggle unchecked) → annual repayment
+    // ≈ 21,216 (for 100K @ 2% / 5y). We assert direction: the figure shown
+    // before/after the toggle changes meaningfully.
+    const summaryBefore = within(card).getByTestId(
+      "new-debt-schedule-summary-0"
+    ).textContent!;
+    expect(summaryBefore).toMatch(/Annual repayment/i);
+
+    const toggle = within(card).getByLabelText(
+      /adjust amount for inflation \(new debt 1\)/i
+    ) as HTMLInputElement;
+    await user.click(toggle);
+
+    const summaryAfter = within(card).getByTestId(
+      "new-debt-schedule-summary-0"
+    ).textContent!;
+    expect(summaryAfter).toMatch(/Annual repayment/i);
+    expect(summaryAfter).not.toBe(summaryBefore);
+  });
+});

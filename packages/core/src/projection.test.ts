@@ -76,6 +76,9 @@ function makeHolding(
 
 // Compact factory for RE investment events in projection tests. We use
 // fixed ids (re-1, re-2, ...) so failures point at a specific event.
+// Defaults `inflateAmount: true` to mirror the production factory and
+// preserve the historical "today's-money inflated to the landing year"
+// convention that the bulk of these tests exercise.
 let reEventCounter = 0;
 function makeReEvent(
   overrides: Partial<RealEstateInvestmentEvent> = {}
@@ -89,12 +92,14 @@ function makeReEvent(
     appreciationRate: 0,
     annualRentalIncome: 0,
     rentalIncomeRate: 0,
+    inflateAmount: true,
     ...overrides
   };
 }
 
 // Compact factory for windfall events. Fixed ids (`wf-1`, `wf-2`, ...) so
-// failures point at a specific event.
+// failures point at a specific event. Defaults `inflateAmount: true` to
+// mirror the production factory.
 let wfEventCounter = 0;
 function makeWindfallEvent(
   overrides: Partial<WindfallEvent> = {}
@@ -105,14 +110,16 @@ function makeWindfallEvent(
     type: "windfall",
     amount: 0,
     year: 0,
+    inflateAmount: true,
     ...overrides
   };
 }
 
 // Compact factory for new-debt life events. Fixed ids (`nd-1`, `nd-2`, ...)
 // so failures point at a specific event. Defaults match the production
-// factory's spirit (zero principal, overTime repayment, 0% interest) so
-// callers can override only what each test cares about.
+// factory's spirit (zero principal, overTime repayment, 0% interest,
+// inflateAmount: true) so callers can override only what each test cares
+// about.
 let newDebtCounter = 0;
 function makeNewDebtEvent(
   overrides: Partial<NewDebtEvent> = {}
@@ -126,6 +133,7 @@ function makeNewDebtEvent(
     repaymentType: "overTime",
     startYear: 0,
     endYear: 0,
+    inflateAmount: true,
     ...overrides
   };
 }
@@ -2018,6 +2026,137 @@ describe("new debt life events", () => {
     const snapshot = JSON.stringify(inputs);
     projectNetWorth(inputs, FIXED_NOW);
     expect(JSON.stringify(inputs)).toBe(snapshot);
+  });
+});
+
+describe("inflateAmount=false on life-event variants", () => {
+  // Each variant defaults to `inflateAmount: true` (the historical
+  // convention: today's money inflated to the landing year). These tests
+  // pin down the opposite leg — when the user opts out, the entered amount
+  // must land at face value with no inflator applied, regardless of how
+  // far in the future the event lands.
+  const startYear = FIXED_NOW.getFullYear();
+  const inflationRate = 0.05;
+  const quietBase: PlanInputs = {
+    ...BASE_INPUTS,
+    startAssets: 1_000_000,
+    cashBalance: 0,
+    annualIncome: 0,
+    monthlySpending: 0,
+    nominalReturn: 0,
+    inflationRate
+  };
+
+  it("lands a windfall at face value when inflateAmount is false", () => {
+    const event = makeWindfallEvent({
+      amount: 100_000,
+      year: startYear + 10,
+      inflateAmount: false
+    });
+    const points = projectNetWorth(
+      { ...quietBase, events: [event] },
+      FIXED_NOW
+    );
+    money(points[10].netWorth, 1_000_000 + 100_000, 0.5);
+  });
+
+  it("differs from inflateAmount=true by the exact inflator factor at the landing year", () => {
+    // Pair the same windfall both ways and confirm the year-of-landing
+    // delta is `amount * (inflator - 1)` — the factor we toggle off.
+    const onEvent = makeWindfallEvent({
+      amount: 100_000,
+      year: startYear + 10,
+      inflateAmount: true
+    });
+    const offEvent = makeWindfallEvent({
+      amount: 100_000,
+      year: startYear + 10,
+      inflateAmount: false
+    });
+    const onPts = projectNetWorth(
+      { ...quietBase, events: [onEvent] },
+      FIXED_NOW
+    );
+    const offPts = projectNetWorth(
+      { ...quietBase, events: [offEvent] },
+      FIXED_NOW
+    );
+    const inflator = (1 + inflationRate) ** 10;
+    money(onPts[10].netWorth - offPts[10].netWorth, 100_000 * (inflator - 1), 0.5);
+  });
+
+  it("seeds RE investment buckets at face value when inflateAmount is false", () => {
+    const event = makeReEvent({
+      purchaseAmount: 200_000,
+      purchaseYear: startYear + 5,
+      appreciationRate: 0,
+      annualRentalIncome: 6_000,
+      rentalIncomeRate: 0,
+      inflateAmount: false
+    });
+    const points = projectNetWorth(
+      { ...quietBase, events: [event] },
+      FIXED_NOW
+    );
+    // Property bucket = 200K (no inflator). Liquid year-of-purchase impact
+    // = −200K (purchase) + 6K (first year of face-value rent).
+    money(points[5].realEstate, 200_000, 0.5);
+    money(points[5].liquid, 1_000_000 - 200_000 + 6_000, 0.5);
+  });
+
+  it("disburses a new debt at face value when inflateAmount is false", () => {
+    // Without inflator: 100K disbursed at startYear, 5-year overTime at
+    // 0% → annualPayment = 20K. Year-of-disbursement liquid = 1M + 100K −
+    // 20K = 1,080,000; debt balance = 80K; both unaffected by 5%
+    // inflation despite the 3-year landing offset.
+    const event = makeNewDebtEvent({
+      principal: 100_000,
+      interestRate: 0,
+      repaymentType: "overTime",
+      startYear: startYear + 3,
+      endYear: startYear + 8,
+      inflateAmount: false
+    });
+    const points = projectNetWorth(
+      { ...quietBase, events: [event] },
+      FIXED_NOW
+    );
+    money(points[3].liquid, 1_080_000, 0.5);
+    money(points[3].debt, 80_000, 0.5);
+    // By endYear the loan is fully repaid, regardless of inflator setting.
+    money(points[8].debt, 0, 0.5);
+  });
+
+  it("year-0 disbursement of a new debt is unaffected by inflateAmount (inflator is 1)", () => {
+    // A loan with startYear === projection's startYear lands at face value
+    // either way (the year-0 path doesn't apply the inflator), so the
+    // toggle should produce identical projections in this corner case.
+    const onEvent = makeNewDebtEvent({
+      principal: 100_000,
+      interestRate: 0,
+      startYear,
+      endYear: startYear + 5,
+      inflateAmount: true
+    });
+    const offEvent = makeNewDebtEvent({
+      principal: 100_000,
+      interestRate: 0,
+      startYear,
+      endYear: startYear + 5,
+      inflateAmount: false
+    });
+    const onPts = projectNetWorth(
+      { ...quietBase, events: [onEvent] },
+      FIXED_NOW
+    );
+    const offPts = projectNetWorth(
+      { ...quietBase, events: [offEvent] },
+      FIXED_NOW
+    );
+    for (let i = 0; i < onPts.length; i += 1) {
+      money(onPts[i].liquid, offPts[i].liquid, 0.5);
+      money(onPts[i].debt, offPts[i].debt, 0.5);
+    }
   });
 });
 

@@ -175,6 +175,26 @@ describe("RealEstateInvestmentEventSchema", () => {
       })
     ).toThrow();
   });
+
+  it("defaults inflateAmount to true when omitted (legacy stored events)", () => {
+    const { inflateAmount: _omit, ...rest } = valid;
+    const parsed = RealEstateInvestmentEventSchema.parse(rest);
+    expect(parsed.inflateAmount).toBe(true);
+  });
+
+  it("preserves inflateAmount=false when set explicitly", () => {
+    const parsed = RealEstateInvestmentEventSchema.parse({
+      ...valid,
+      inflateAmount: false
+    });
+    expect(parsed.inflateAmount).toBe(false);
+  });
+
+  it("rejects a non-boolean inflateAmount", () => {
+    expect(() =>
+      RealEstateInvestmentEventSchema.parse({ ...valid, inflateAmount: "yes" })
+    ).toThrow();
+  });
 });
 
 describe("LifeEventSchema", () => {
@@ -223,6 +243,10 @@ describe("makeDefaultRealEstateInvestment", () => {
     const event = makeDefaultRealEstateInvestment();
     expect(event.appreciationRate).toBe(0);
     expect(event.rentalIncomeRate).toBe(0);
+  });
+
+  it("defaults inflateAmount to true (preserves historical convention)", () => {
+    expect(makeDefaultRealEstateInvestment().inflateAmount).toBe(true);
   });
 });
 
@@ -353,6 +377,26 @@ describe("WindfallEventSchema", () => {
       WindfallEventSchema.parse({ ...valid, year: 2030.5 })
     ).toThrow();
   });
+
+  it("defaults inflateAmount to true when omitted (legacy stored events)", () => {
+    const { inflateAmount: _omit, ...rest } = valid;
+    const parsed = WindfallEventSchema.parse(rest);
+    expect(parsed.inflateAmount).toBe(true);
+  });
+
+  it("preserves inflateAmount=false when set explicitly", () => {
+    const parsed = WindfallEventSchema.parse({
+      ...valid,
+      inflateAmount: false
+    });
+    expect(parsed.inflateAmount).toBe(false);
+  });
+
+  it("rejects a non-boolean inflateAmount", () => {
+    expect(() =>
+      WindfallEventSchema.parse({ ...valid, inflateAmount: 1 })
+    ).toThrow();
+  });
 });
 
 describe("makeDefaultWindfallEvent", () => {
@@ -373,6 +417,10 @@ describe("makeDefaultWindfallEvent", () => {
 
   it("uses the windfall type discriminator", () => {
     expect(makeDefaultWindfallEvent().type).toBe("windfall");
+  });
+
+  it("defaults inflateAmount to true (preserves historical convention)", () => {
+    expect(makeDefaultWindfallEvent().inflateAmount).toBe(true);
   });
 });
 
@@ -439,6 +487,26 @@ describe("NewDebtEventSchema", () => {
       NewDebtEventSchema.parse({ ...valid, endYear: 2040.5 })
     ).toThrow();
   });
+
+  it("defaults inflateAmount to true when omitted (legacy stored events)", () => {
+    const { inflateAmount: _omit, ...rest } = valid;
+    const parsed = NewDebtEventSchema.parse(rest);
+    expect(parsed.inflateAmount).toBe(true);
+  });
+
+  it("preserves inflateAmount=false when set explicitly", () => {
+    const parsed = NewDebtEventSchema.parse({
+      ...valid,
+      inflateAmount: false
+    });
+    expect(parsed.inflateAmount).toBe(false);
+  });
+
+  it("rejects a non-boolean inflateAmount", () => {
+    expect(() =>
+      NewDebtEventSchema.parse({ ...valid, inflateAmount: null })
+    ).toThrow();
+  });
 });
 
 describe("makeDefaultNewDebtEvent", () => {
@@ -469,5 +537,9 @@ describe("makeDefaultNewDebtEvent", () => {
 
   it("uses the newDebt type discriminator", () => {
     expect(makeDefaultNewDebtEvent().type).toBe("newDebt");
+  });
+
+  it("defaults inflateAmount to true (preserves historical convention)", () => {
+    expect(makeDefaultNewDebtEvent().inflateAmount).toBe(true);
   });
 });

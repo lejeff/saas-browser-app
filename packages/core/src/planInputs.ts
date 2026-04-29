@@ -34,7 +34,15 @@ export const RealEstateInvestmentEventSchema = z.object({
     .number()
     .finite()
     .min(MIN_APPRECIATION)
-    .max(MAX_APPRECIATION)
+    .max(MAX_APPRECIATION),
+  // When true, today's-money inputs (`purchaseAmount` + `annualRentalIncome`)
+  // are inflated to the purchase year before the engine uses them — same
+  // convention as windfall and new-debt principal. When false, the
+  // nominal entered values land as-is at the purchase year (the user is
+  // already entering future-year nominal numbers). Defaults to true so
+  // legacy stored events without this field migrate to the historical
+  // inflate-to-landing-year behavior on load.
+  inflateAmount: z.boolean().default(true)
 });
 
 export type RealEstateInvestmentEvent = z.infer<
@@ -49,7 +57,14 @@ export const WindfallEventSchema = z.object({
   id: z.string().min(1),
   type: z.literal("windfall"),
   amount: z.number().finite().nonnegative(),
-  year: z.number().int()
+  year: z.number().int(),
+  // When true, the today's-money `amount` is inflated to the landing year
+  // before being deposited into liquid (current convention). When false,
+  // the nominal `amount` lands as-is in the landing year (the user is
+  // already entering a future-year nominal value). Defaults to true so
+  // legacy stored events without this field migrate to the historical
+  // inflate-to-landing-year behavior on load.
+  inflateAmount: z.boolean().default(true)
 });
 
 export type WindfallEvent = z.infer<typeof WindfallEventSchema>;
@@ -72,7 +87,14 @@ export const NewDebtEventSchema = z.object({
     .max(MAX_DEBT_INTEREST_RATE),
   repaymentType: z.enum(DEBT_REPAYMENT_TYPES),
   startYear: z.number().int(),
-  endYear: z.number().int()
+  endYear: z.number().int(),
+  // When true, the today's-money `principal` is inflated to `startYear`
+  // before being disbursed and amortized (current convention, mirrors
+  // windfall and RE purchase). When false, the nominal `principal` is
+  // disbursed as-is at `startYear`. Defaults to true so legacy stored
+  // events without this field migrate to the historical
+  // inflate-to-landing-year behavior on load.
+  inflateAmount: z.boolean().default(true)
 });
 
 export type NewDebtEvent = z.infer<typeof NewDebtEventSchema>;
@@ -218,7 +240,8 @@ export function makeDefaultRealEstateInvestment(): RealEstateInvestmentEvent {
     purchaseYear: new Date().getFullYear() + 5,
     appreciationRate: 0,
     annualRentalIncome: 0,
-    rentalIncomeRate: 0
+    rentalIncomeRate: 0,
+    inflateAmount: true
   };
 }
 
@@ -246,7 +269,8 @@ export function makeDefaultWindfallEvent(): WindfallEvent {
     id: crypto.randomUUID(),
     type: "windfall",
     amount: 0,
-    year: new Date().getFullYear() + 5
+    year: new Date().getFullYear() + 5,
+    inflateAmount: true
   };
 }
 
@@ -265,6 +289,7 @@ export function makeDefaultNewDebtEvent(): NewDebtEvent {
     interestRate: DEFAULT_RATE,
     repaymentType: "overTime",
     startYear: currentYear + 5,
-    endYear: currentYear + 10
+    endYear: currentYear + 10,
+    inflateAmount: true
   };
 }

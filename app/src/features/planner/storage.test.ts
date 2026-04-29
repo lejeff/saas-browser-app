@@ -85,6 +85,9 @@ describe("loadInputs", () => {
   });
 
   it("preserves a valid stored events array on load", () => {
+    // Stored payload predates the inflateAmount toggle (Task 6) — Zod
+    // applies the schema-level `.default(true)` so the loaded event
+    // carries the historical inflate-to-landing-year behavior.
     const validEvent = {
       id: "abc",
       type: "realEstateInvestment",
@@ -97,12 +100,13 @@ describe("loadInputs", () => {
     const stored = JSON.stringify({ ...DEFAULT_PLAN_INPUTS, events: [validEvent] });
     stubStorage({ "planner.inputs.v1": stored });
 
-    expect(loadInputs().events).toEqual([validEvent]);
+    expect(loadInputs().events).toEqual([{ ...validEvent, inflateAmount: true }]);
   });
 
   it("preserves a valid stored windfall event on load", () => {
     // Round-trip the second LifeEvent variant through the same defensive
-    // EventsSchema parse the storage layer applies on load.
+    // EventsSchema parse the storage layer applies on load. Legacy stored
+    // events without inflateAmount hydrate with the schema default.
     const windfall = {
       id: "wf-1",
       type: "windfall",
@@ -115,7 +119,7 @@ describe("loadInputs", () => {
     });
     stubStorage({ "planner.inputs.v1": stored });
 
-    expect(loadInputs().events).toEqual([windfall]);
+    expect(loadInputs().events).toEqual([{ ...windfall, inflateAmount: true }]);
   });
 
   it("preserves a mix of windfall and realEstateInvestment events on load", () => {
@@ -135,7 +139,10 @@ describe("loadInputs", () => {
     });
     stubStorage({ "planner.inputs.v1": stored });
 
-    expect(loadInputs().events).toEqual([windfall, reInvestment]);
+    expect(loadInputs().events).toEqual([
+      { ...windfall, inflateAmount: true },
+      { ...reInvestment, inflateAmount: true }
+    ]);
   });
 
   it("preserves a valid stored newDebt event on load", () => {
@@ -154,7 +161,7 @@ describe("loadInputs", () => {
     });
     stubStorage({ "planner.inputs.v1": stored });
 
-    expect(loadInputs().events).toEqual([newDebt]);
+    expect(loadInputs().events).toEqual([{ ...newDebt, inflateAmount: true }]);
   });
 
   it("preserves a mix of all three life event variants on load", () => {
@@ -183,7 +190,65 @@ describe("loadInputs", () => {
     });
     stubStorage({ "planner.inputs.v1": stored });
 
-    expect(loadInputs().events).toEqual([windfall, reInvestment, newDebt]);
+    expect(loadInputs().events).toEqual([
+      { ...windfall, inflateAmount: true },
+      { ...reInvestment, inflateAmount: true },
+      { ...newDebt, inflateAmount: true }
+    ]);
+  });
+
+  it("hydrates legacy events without inflateAmount with the historical default (true)", () => {
+    // Pre-Task-6 stored events had no `inflateAmount` field. The schema
+    // applies `.default(true)` so they hydrate to the historical
+    // inflate-to-landing-year behavior without losing the user's other
+    // settings.
+    const legacyWindfall = { id: "wf-1", type: "windfall", amount: 25_000, year: 2030 };
+    const legacyReInvestment = {
+      id: "re-1",
+      type: "realEstateInvestment",
+      purchaseAmount: 200_000,
+      purchaseYear: 2032,
+      appreciationRate: 0.02,
+      annualRentalIncome: 6_000,
+      rentalIncomeRate: 0.01
+    };
+    const legacyNewDebt = {
+      id: "nd-1",
+      type: "newDebt",
+      principal: 100_000,
+      interestRate: 0.03,
+      repaymentType: "inFine",
+      startYear: 2031,
+      endYear: 2036
+    };
+    const stored = JSON.stringify({
+      ...DEFAULT_PLAN_INPUTS,
+      events: [legacyWindfall, legacyReInvestment, legacyNewDebt]
+    });
+    stubStorage({ "planner.inputs.v1": stored });
+
+    const loaded = loadInputs();
+    expect(loaded.events).toHaveLength(3);
+    for (const e of loaded.events) {
+      expect((e as { inflateAmount: boolean }).inflateAmount).toBe(true);
+    }
+  });
+
+  it("preserves an explicit inflateAmount=false on a stored event", () => {
+    const explicit = {
+      id: "wf-1",
+      type: "windfall",
+      amount: 50_000,
+      year: 2031,
+      inflateAmount: false
+    };
+    const stored = JSON.stringify({
+      ...DEFAULT_PLAN_INPUTS,
+      events: [explicit]
+    });
+    stubStorage({ "planner.inputs.v1": stored });
+
+    expect(loadInputs().events).toEqual([explicit]);
   });
 
   it("falls back to [] when stored events array is malformed (keeps other fields)", () => {

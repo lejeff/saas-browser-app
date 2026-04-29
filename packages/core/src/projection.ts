@@ -203,7 +203,8 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
   // Seed the balance + annualPayment and disburse principal to liquid here
   // so the year-0 projection point reflects the loan, then in-loop
   // amortization picks up at year-1 once `year >= startYear` is true.
-  // No inflator at year 0 (factor = 1), so principal lands at face value.
+  // No inflator at year 0 (factor = 1), so principal lands at face value
+  // regardless of `event.inflateAmount`.
   for (const event of newDebtEvents) {
     if (event.startYear === startYear && event.principal > 0) {
       const state = newDebtStates.get(event.id)!;
@@ -242,13 +243,17 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // convention). After the purchase year, compound both at the
       // per-event rates. Active rentals contribute to netFlow below; the
       // purchase amount is deducted from the liquid portfolio at year-end,
-      // mirroring how a one-off windfall is added.
+      // mirroring how a one-off windfall is added. When
+      // `event.inflateAmount` is false, the user is already entering
+      // nominal future-year values, so we skip the inflator and seed both
+      // buckets at face value.
       let reInvestmentRental = 0;
       for (const event of reInvestmentEvents) {
         const state = reInvestmentStates.get(event.id)!;
+        const factor = event.inflateAmount ? inflator : 1;
         if (startYear + i === event.purchaseYear) {
-          state.value = event.purchaseAmount * inflator;
-          state.rental = event.annualRentalIncome * inflator;
+          state.value = event.purchaseAmount * factor;
+          state.rental = event.annualRentalIncome * factor;
         } else if (startYear + i > event.purchaseYear) {
           state.value *= 1 + event.appreciationRate;
           state.rental *= 1 + event.rentalIncomeRate;
@@ -292,12 +297,15 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // active event into `newDebtCashOut` for inclusion in netFlow's
       // outflow leg. The same year that disburses principal also makes the
       // first payment, so `assets` nets to (principal − first payment) at
-      // year-end.
+      // year-end. When `event.inflateAmount` is false, the user is already
+      // entering a future-year nominal principal, so we skip the inflator
+      // and disburse face value.
       let newDebtCashOut = 0;
       for (const event of newDebtEvents) {
         const state = newDebtStates.get(event.id)!;
         if (year === event.startYear && event.principal > 0) {
-          state.balance = event.principal * inflator;
+          const factor = event.inflateAmount ? inflator : 1;
+          state.balance = event.principal * factor;
           if (event.repaymentType === "overTime") {
             const term = Math.max(event.endYear - event.startYear, 1);
             state.annualPayment = computeOverTimeAnnualPayment(
@@ -360,10 +368,13 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // year-end of the matching calendar year, so it starts compounding
       // from the following year. Amounts are entered in today's money, so
       // inflate to the landing year (same convention as the RE investment
-      // purchase deduction below).
+      // purchase deduction below). When `event.inflateAmount` is false,
+      // the user is already entering a future-year nominal value, so the
+      // raw `amount` lands as-is.
       for (const event of windfallEvents) {
         if (startYear + i === event.year && event.amount > 0) {
-          assets += event.amount * inflator;
+          const factor = event.inflateAmount ? inflator : 1;
+          assets += event.amount * factor;
         }
       }
 
@@ -371,10 +382,13 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // principal (inflated to the landing year) into liquid assets at
       // year-end. The amortization for this year already ran in netFlow
       // above, so the net assets impact this year is (principal − first
-      // payment); subsequent years are pure amortization.
+      // payment); subsequent years are pure amortization. When
+      // `event.inflateAmount` is false, the user is already entering a
+      // future-year nominal principal, so the raw value is disbursed.
       for (const event of newDebtEvents) {
         if (startYear + i === event.startYear && event.principal > 0) {
-          assets += event.principal * inflator;
+          const factor = event.inflateAmount ? inflator : 1;
+          assets += event.principal * factor;
         }
       }
 
@@ -393,10 +407,13 @@ export function projectNetWorth(input: PlanInputs, now: Date = new Date()): Proj
       // Real estate investment purchase: deduct the today's-money amount,
       // inflated to the landing year, from the liquid portfolio at
       // year-end. The matching property value/rental were already seeded
-      // into the event's bucket at the top of this iteration.
+      // into the event's bucket at the top of this iteration. When
+      // `event.inflateAmount` is false, the user is already entering a
+      // future-year nominal value, so the raw amount is deducted.
       for (const event of reInvestmentEvents) {
         if (startYear + i === event.purchaseYear && event.purchaseAmount > 0) {
-          assets -= event.purchaseAmount * inflator;
+          const factor = event.inflateAmount ? inflator : 1;
+          assets -= event.purchaseAmount * factor;
         }
       }
     }
