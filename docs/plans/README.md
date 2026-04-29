@@ -5,7 +5,7 @@ Filenames are prefixed with the date the plan was created.
 
 > For the current roadmap of upcoming work, see [`ROADMAP.md`](../../ROADMAP.md) at the repo root.
 
-**24 plans** across 5 days.
+**25 plans** across 5 days.
 
 ## 2026-04-22
 
@@ -45,3 +45,4 @@ Filenames are prefixed with the date the plan was created.
 
 - [Real Estate as stackable holdings](./2026-04-28-real-estate-holdings-cards.md) — Replace the two flat Primary Residence / Other Property fields on `PlanInputs` with a single stackable `realEstateHoldings: RealEstateHolding[]` array, mirroring the discriminated-union + add/remove card pattern used by `RealEstateInvestmentEvent` in the Life Events section. Each holding card keeps the existing inputs (value + annual appreciation rate) and stays inside the Real Estate form category; `events` is untouched.
 - [Windfalls as life events](./2026-04-28-windfalls-as-life-events.md) — Convert the single `windfallAmount` / `windfallYear` scalars into a stackable `WindfallEvent` variant inside the existing `LifeEvent` discriminated union, with an `+ Add Windfall` button and zero windfalls by default. Mirrors the Real Estate Investment card pattern (including the inflation-adjusted future-value helper text), and rides the existing storage union round-trip with no `storage.ts` changes.
+- [Life events feature wave](./2026-04-28-life-events-feature-wave.md) — Six sequential tasks polishing the Life Events section and adjacent categories: per-holding rental income, dropping the global rental fields, a New Debt life event variant, color-coding life-event cards by destination category, full-pill borders on the Assets & Debt subsections, and an `Adjust amount for inflation` toggle on every life-event card.

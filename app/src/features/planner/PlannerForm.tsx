@@ -843,6 +843,36 @@ function DebtScheduleSummary({
   );
 }
 
+// Small inline checkbox + label sitting just under each life-event card's
+// Amount field. Toggles whether the today's-money input is inflated to the
+// landing year (current convention; mirrors the windfall / RE / new-debt
+// inflator path in `projection.ts`) or whether the entered amount is
+// treated as a nominal future-year value. Styled to match the helper text
+// (small, muted) so it doesn't compete visually with the slider rows
+// above and below it.
+function InflateAmountToggle({
+  checked,
+  onChange,
+  ariaLabel
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={ariaLabel}
+        className="h-3.5 w-3.5 cursor-pointer accent-[var(--navy)]"
+      />
+      Adjust amount for inflation
+    </label>
+  );
+}
+
 function RealEstateInvestmentCard({
   event,
   index,
@@ -866,11 +896,13 @@ function RealEstateInvestmentCard({
 }) {
   const { format } = useCurrency();
   // Match the projection engine: today's-money inputs are inflated to the
-  // landing year. Clamp the exponent at 0 so a past purchaseYear still shows
-  // the user's entered amount instead of a deflated one.
+  // landing year when `inflateAmount` is on. Clamp the exponent at 0 so a
+  // past purchaseYear still shows the user's entered amount instead of a
+  // deflated one.
   const yearsToPurchase = Math.max(0, event.purchaseYear - currentYear);
-  const inflatedPurchaseAmount =
-    event.purchaseAmount * (1 + inflationRate) ** yearsToPurchase;
+  const inflatedPurchaseAmount = event.inflateAmount
+    ? event.purchaseAmount * (1 + inflationRate) ** yearsToPurchase
+    : event.purchaseAmount;
   const purchaseYearSpec: SliderSpec = {
     key: "reInvestmentPurchaseYear",
     label: "Purchase year",
@@ -914,15 +946,22 @@ function RealEstateInvestmentCard({
         min={0}
         max={100_000_000}
       />
+      <InflateAmountToggle
+        checked={event.inflateAmount}
+        onChange={(next) => onChange({ inflateAmount: next })}
+        ariaLabel={`Adjust amount for inflation (Real Estate Investment ${index + 1})`}
+      />
       <SliderRow
         spec={purchaseYearSpec}
         value={event.purchaseYear}
         onChange={(next) => onChange({ purchaseYear: next })}
         helper={
-          // Surface the inflation-adjusted purchase price (i.e. the actual
-          // amount the engine deducts from liquid assets in that year) next
-          // to the relative timing, e.g. "€1,104,081 in 5 years". On a fresh
-          // blank-slate card we drop back to just the relative phrase.
+          // Always pair the amount the engine actually deducts from liquid
+          // assets with the relative timing, e.g. "€1,104,081 in 5 years".
+          // When `inflateAmount` is on we use the inflated nominal cost;
+          // when off we use the entered face value. On a fresh blank-slate
+          // card (purchaseAmount === 0) we drop back to just the relative
+          // phrase so the helper doesn't read "€0 in 5 years".
           event.purchaseAmount > 0
             ? `${format(inflatedPurchaseAmount)} ${yearsFromNow(event.purchaseYear, currentYear)}`
             : yearsFromNow(event.purchaseYear, currentYear)
@@ -982,10 +1021,13 @@ function WindfallEventCard({
 }) {
   const { format } = useCurrency();
   // Match the projection engine: today's-money inputs are inflated to the
-  // landing year. Clamp the exponent at 0 so a past year still shows the
-  // user's entered amount instead of a deflated one.
+  // landing year when `inflateAmount` is on. Clamp the exponent at 0 so a
+  // past year still shows the user's entered amount instead of a deflated
+  // one.
   const yearsToLanding = Math.max(0, event.year - currentYear);
-  const inflatedAmount = event.amount * (1 + inflationRate) ** yearsToLanding;
+  const inflatedAmount = event.inflateAmount
+    ? event.amount * (1 + inflationRate) ** yearsToLanding
+    : event.amount;
   const yearSpec: SliderSpec = {
     key: "windfallEventYear",
     label: "Year",
@@ -1011,15 +1053,22 @@ function WindfallEventCard({
         min={0}
         max={100_000_000}
       />
+      <InflateAmountToggle
+        checked={event.inflateAmount}
+        onChange={(next) => onChange({ inflateAmount: next })}
+        ariaLabel={`Adjust amount for inflation (Windfall ${index + 1})`}
+      />
       <SliderRow
         spec={yearSpec}
         value={event.year}
         onChange={(next) => onChange({ year: next })}
         helper={
-          // Surface the inflation-adjusted nominal deposit (what the engine
-          // actually adds to the portfolio in that year) next to the
-          // relative timing, e.g. "€11,314 in 5 years". On a fresh
-          // blank-slate card we drop back to just the relative phrase.
+          // Always pair the amount the engine actually adds to the
+          // portfolio with the relative timing, e.g. "€11,314 in 5 years".
+          // When `inflateAmount` is on we use the inflated nominal
+          // deposit; when off we use the entered face value. On a fresh
+          // blank-slate card (amount === 0) we drop back to just the
+          // relative phrase so the helper doesn't read "€0 in 5 years".
           event.amount > 0
             ? `${format(inflatedAmount)} ${yearsFromNow(event.year, currentYear)}`
             : yearsFromNow(event.year, currentYear)
@@ -1062,10 +1111,13 @@ function NewDebtEventCard({
 }) {
   const { format } = useCurrency();
   // Match the projection engine: today's-money inputs are inflated to the
-  // landing year. Clamp the exponent at 0 so a past startYear still shows
-  // the user's entered amount instead of a deflated one.
+  // landing year when `inflateAmount` is on. Clamp the exponent at 0 so a
+  // past startYear still shows the user's entered amount instead of a
+  // deflated one.
   const yearsToStart = Math.max(0, event.startYear - currentYear);
-  const inflatedPrincipal = event.principal * (1 + inflationRate) ** yearsToStart;
+  const inflatedPrincipal = event.inflateAmount
+    ? event.principal * (1 + inflationRate) ** yearsToStart
+    : event.principal;
 
   const interestRateSpec: SliderSpec = {
     key: "newDebtInterestRate",
@@ -1112,6 +1164,11 @@ function NewDebtEventCard({
         min={0}
         max={100_000_000}
       />
+      <InflateAmountToggle
+        checked={event.inflateAmount}
+        onChange={(next) => onChange({ inflateAmount: next })}
+        ariaLabel={`Adjust amount for inflation (New Debt ${index + 1})`}
+      />
       <SliderRow
         spec={interestRateSpec}
         value={event.interestRate}
@@ -1140,10 +1197,12 @@ function NewDebtEventCard({
         value={event.startYear}
         onChange={(next) => onChange({ startYear: next })}
         helper={
-          // Surface the inflation-adjusted nominal disbursement (what the
-          // engine actually deposits into liquid in that year) next to the
-          // relative timing, e.g. "€220K in 3 years". On a blank-slate card
-          // we drop back to just the relative phrase.
+          // Always pair the amount the engine actually deposits into
+          // liquid with the relative timing, e.g. "€220K in 3 years".
+          // When `inflateAmount` is on we use the inflated nominal
+          // disbursement; when off we use the entered face value. On a
+          // fresh blank-slate card (principal === 0) we drop back to just
+          // the relative phrase so the helper doesn't read "€0 in 3 years".
           event.principal > 0
             ? `${format(inflatedPrincipal)} ${yearsFromNow(event.startYear, currentYear)}`
             : yearsFromNow(event.startYear, currentYear)

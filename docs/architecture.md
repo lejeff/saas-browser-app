@@ -402,43 +402,53 @@ adding another schema to `LifeEventSchema` in `packages/core/src/planInputs.ts`.
 ##### `RealEstateInvestmentEvent` (`type: "realEstateInvestment"`)
 
 A future property purchase: at `purchaseYear` the engine deducts
-`purchaseAmount` (in today's money, inflated to the landing year) from the
-liquid portfolio, seeds a per-event property bucket and rental stream, then
-compounds both at the per-event rates each subsequent year. Behaves like a
-`RealEstateHolding` but starts in the future and is funded from liquid
-assets.
+`purchaseAmount` (in today's money, inflated to the landing year when
+`inflateAmount` is true) from the liquid portfolio, seeds a per-event
+property bucket and rental stream, then compounds both at the per-event
+rates each subsequent year. Behaves like a `RealEstateHolding` but starts
+in the future and is funded from liquid assets. When `inflateAmount` is
+false, the entered `purchaseAmount` and `annualRentalIncome` are treated
+as nominal future-year values and land at face value.
 
 | Field | Type | Units | Constraints |
 | --- | --- | --- | --- |
 | `id` | string | — | non-empty (uuid in practice) |
 | `type` | literal | — | `"realEstateInvestment"` |
-| `purchaseAmount` | number | currency (today's money) | ≥ 0 |
+| `purchaseAmount` | number | currency (today's money by default) | ≥ 0 |
 | `purchaseYear` | number | year | integer |
 | `appreciationRate` | number | fraction | −0.05 … 0.10 |
-| `annualRentalIncome` | number | currency (today's money) | ≥ 0 |
+| `annualRentalIncome` | number | currency (today's money by default) | ≥ 0 |
 | `rentalIncomeRate` | number | fraction | −0.05 … 0.10 |
+| `inflateAmount` | boolean | — | default `true`; legacy stored events without the field hydrate to `true` |
 
 ##### `WindfallEvent` (`type: "windfall"`)
 
 A one-off cash deposit landing in the liquid portfolio at year-end of `year`.
-The amount is entered in today's money and the engine inflates it to the
-landing year (same convention as `RealEstateInvestmentEvent.purchaseAmount`).
-Multiple windfall events stack independently; each fires once when its `year`
-matches the projection's calendar year.
+The amount is entered in today's money by default and the engine inflates
+it to the landing year (same convention as
+`RealEstateInvestmentEvent.purchaseAmount`); when `inflateAmount` is false,
+the entered `amount` lands at face value. Multiple windfall events stack
+independently; each fires once when its `year` matches the projection's
+calendar year.
 
 | Field | Type | Units | Constraints |
 | --- | --- | --- | --- |
 | `id` | string | — | non-empty (uuid in practice) |
 | `type` | literal | — | `"windfall"` |
-| `amount` | number | currency (today's money) | ≥ 0 |
+| `amount` | number | currency (today's money by default) | ≥ 0 |
 | `year` | number | year | integer |
+| `inflateAmount` | boolean | — | default `true`; legacy stored events without the field hydrate to `true` |
 
 ##### `NewDebtEvent` (`type: "newDebt"`)
 
 A future loan: at `startYear` the engine deposits `principal` (in today's
-money, inflated to the landing year — same convention as `WindfallEvent` and
-`RealEstateInvestmentEvent.purchaseAmount`) into liquid assets and starts
-amortizing on its own schedule until `endYear`. `repaymentType: "overTime"`
+money by default, inflated to the landing year — same convention as
+`WindfallEvent` and `RealEstateInvestmentEvent.purchaseAmount`) into liquid
+assets and starts amortizing on its own schedule until `endYear`. When
+`inflateAmount` is false, the entered `principal` is treated as a
+nominal future-year value and disbursed at face value (the year-0 path
+already lands at face value because the inflator is 1, so the toggle has
+no effect for `startYear === currentYear`). `repaymentType: "overTime"`
 uses the closed-form fixed annual payment that fully repays principal over
 the (`endYear` − `startYear`) window; `"inFine"` pays interest only each
 year and balloons the principal at `endYear`. The same year that disburses
@@ -452,11 +462,12 @@ new-debt event; the per-event balance is summed into the projection point's
 | --- | --- | --- | --- |
 | `id` | string | — | non-empty (uuid in practice) |
 | `type` | literal | — | `"newDebt"` |
-| `principal` | number | currency (today's money) | ≥ 0 |
+| `principal` | number | currency (today's money by default) | ≥ 0 |
 | `interestRate` | number | fraction | 0 … 0.20 |
 | `repaymentType` | enum | — | `"overTime"` \| `"inFine"` |
 | `startYear` | number | year | integer |
 | `endYear` | number | year | integer |
+| `inflateAmount` | boolean | — | default `true`; legacy stored events without the field hydrate to `true` |
 
 Derived output: `ProjectionPoint[]` with `{ year, age, netWorth, liquid, savings, otherAssets, realEstate, debt }`.
 
