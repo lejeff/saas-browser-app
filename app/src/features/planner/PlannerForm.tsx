@@ -201,6 +201,34 @@ function summarizeRealEstate(
   return total > 0 ? formatCompact(total) : "—";
 }
 
+// Single-line totals for the three Assets & Debt sub-pills, surfaced in
+// each subsection's collapsed-pill summary. The parent pill title gives
+// context (Liquid / Non-Liquid / Debt), so we omit a label and just
+// show the formatted total. Em-dash fallback when the bucket is empty
+// mirrors the convention in `summarizeRealEstate`.
+function summarizeLiquidSubsection(
+  v: PlanInputs,
+  format: (n: number) => string
+): string {
+  const total = v.startAssets + v.cashBalance;
+  return total > 0 ? format(total) : "—";
+}
+
+function summarizeNonLiquidSubsection(
+  v: PlanInputs,
+  format: (n: number) => string
+): string {
+  const total = v.nonLiquidInvestments + v.otherFixedAssets;
+  return total > 0 ? format(total) : "—";
+}
+
+function summarizeDebtSubsectionHeadline(
+  v: PlanInputs,
+  format: (n: number) => string
+): string {
+  return v.startDebt > 0 ? format(v.startDebt) : "—";
+}
+
 function summarizeLifeEvents(
   v: PlanInputs,
   formatCompact: (n: number) => string
@@ -238,6 +266,65 @@ function summarizeMacro(v: PlanInputs): string {
   return `Inflation ${(v.inflationRate * 100).toFixed(1)}%`;
 }
 
+// Per-card summary lines shown when a life-event card is collapsed.
+// They're intentionally short (one line) and lead with the displayed
+// amount — the value the engine actually uses, which is the entered
+// value inflated to the landing year when `inflateAmount` is on, and
+// the raw entered value when it's off. This matches the convention the
+// in-card year-slider helpers use, so the headline and the helper line
+// always agree. When the amount is zero (a freshly-added blank card),
+// fall back to a year-only hint so the line never reads "€0 in 2031".
+function summarizeWindfallCard(
+  event: WindfallEvent,
+  displayedAmount: number,
+  format: (n: number) => string
+): string {
+  if (displayedAmount > 0) return `${format(displayedAmount)} in ${event.year}`;
+  return `Year ${event.year}`;
+}
+
+function summarizeRealEstateInvestmentCard(
+  event: RealEstateInvestmentEvent,
+  displayedAmount: number,
+  format: (n: number) => string
+): string {
+  if (displayedAmount > 0)
+    return `${format(displayedAmount)} in ${event.purchaseYear}`;
+  return `Year ${event.purchaseYear}`;
+}
+
+function summarizeNewDebtCard(
+  event: NewDebtEvent,
+  displayedPrincipal: number,
+  format: (n: number) => string
+): string {
+  if (displayedPrincipal > 0)
+    return `${format(displayedPrincipal)} from ${event.startYear}`;
+  return `From ${event.startYear}`;
+}
+
+// Existing real-estate holdings have no start year and no inflation
+// toggle (they're assets the user already owns), so the summary just
+// surfaces the two facts that drive the projection: current value and
+// annual rental income. We join them with a middle-dot when both are
+// present, fall back to whichever side is non-zero, and use an em-dash
+// (matching the Liquid/Non-Liquid empty state) when the card hasn't
+// been filled in yet.
+function summarizeRealEstateHoldingCard(
+  holding: RealEstateHolding,
+  format: (n: number) => string
+): string {
+  const valuePart = holding.value > 0 ? format(holding.value) : null;
+  const rentPart =
+    holding.annualRentalIncome > 0
+      ? `${format(holding.annualRentalIncome)} rent/yr`
+      : null;
+  if (valuePart && rentPart) return `${valuePart} \u00b7 ${rentPart}`;
+  if (valuePart) return valuePart;
+  if (rentPart) return rentPart;
+  return "\u2014";
+}
+
 export function PlannerForm({ value, onChange, onReset }: Props) {
   const { format, formatCompact } = useCurrency();
   const update = <K extends keyof PlanInputs>(key: K, next: PlanInputs[K]) => {
@@ -257,25 +344,48 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
     onChange({ ...value, events: value.events.filter((e) => e.id !== id) });
   };
 
-  const addRealEstateInvestment = () => {
+  // Tracks IDs of life-event cards added during this PlannerForm mount.
+  // Cards default to COLLAPSED (matching the Non-Liquid sub-pill UX)
+  // EXCEPT for ones the user just created via +Add — those auto-expand
+  // so the user can fill them in immediately. After a page reload the
+  // set resets, so all loaded cards are collapsed by default.
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
+
+  const markAndAdd = (newEvent: LifeEvent) => {
+    setNewlyAddedIds((prev) => {
+      const next = new Set(prev);
+      next.add(newEvent.id);
+      return next;
+    });
+    onChange({ ...value, events: [...value.events, newEvent] });
+  };
+
+  // Real-estate holdings live on a separate top-level array (they're
+  // assets the user already owns, not life events), but we want the
+  // same auto-expand-on-add UX. IDs are UUIDs so the shared
+  // newlyAddedIds Set won't collide with event IDs.
+  const markAndAddHolding = (newHolding: RealEstateHolding) => {
+    setNewlyAddedIds((prev) => {
+      const next = new Set(prev);
+      next.add(newHolding.id);
+      return next;
+    });
     onChange({
       ...value,
-      events: [...value.events, makeDefaultRealEstateInvestment()]
+      realEstateHoldings: [...value.realEstateHoldings, newHolding]
     });
+  };
+
+  const addRealEstateInvestment = () => {
+    markAndAdd(makeDefaultRealEstateInvestment());
   };
 
   const addWindfallEvent = () => {
-    onChange({
-      ...value,
-      events: [...value.events, makeDefaultWindfallEvent()]
-    });
+    markAndAdd(makeDefaultWindfallEvent());
   };
 
   const addNewDebtEvent = () => {
-    onChange({
-      ...value,
-      events: [...value.events, makeDefaultNewDebtEvent()]
-    });
+    markAndAdd(makeDefaultNewDebtEvent());
   };
 
   const reInvestments = value.events.filter(
@@ -307,13 +417,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
   };
 
   const addRealEstateHolding = () => {
-    onChange({
-      ...value,
-      realEstateHoldings: [
-        ...value.realEstateHoldings,
-        makeDefaultRealEstateHolding()
-      ]
-    });
+    markAndAddHolding(makeDefaultRealEstateHolding());
   };
 
   // Recomputed per render so the helper text under the year sliders stays
@@ -425,7 +529,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             title="Liquid"
             accent={ACCENT.assetsDebt}
             testId="subsection-liquid"
-            defaultOpen
+            summary={summarizeLiquidSubsection(value, format)}
           >
             {renderAmounts([LIQUID_AMOUNTS[0]])}
             <SliderRow
@@ -440,6 +544,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             title="Non-Liquid"
             accent={ACCENT.assetsDebt}
             testId="subsection-non-liquid"
+            summary={summarizeNonLiquidSubsection(value, format)}
           >
             {/* Each non-liquid bucket pairs an amount field with a liquidity
                 year slider; at that year the projection moves the value into
@@ -478,6 +583,26 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             title="Debt"
             accent={ACCENT.debt}
             testId="subsection-debt"
+            // Two-line collapsed summary mirroring the New Debt life-event
+            // card: balance on top (no "from <year>" since the debt is
+            // already active), schedule helper line below using the same
+            // shared `formatDebtScheduleText` the in-card paragraph uses.
+            summary={
+              <>
+                <div>{summarizeDebtSubsectionHeadline(value, format)}</div>
+                <div>
+                  {formatDebtScheduleText({
+                    principal: value.startDebt,
+                    interestRate: value.debtInterestRate,
+                    repaymentType: value.debtRepaymentType,
+                    startYear: currentYear,
+                    endYear: value.debtEndYear,
+                    format,
+                    messages: EXISTING_DEBT_SCHEDULE_MESSAGES
+                  })}
+                </div>
+              </>
+            }
           >
             {renderAmounts(DEBT_AMOUNTS)}
             <SliderRow
@@ -521,6 +646,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             onChange={(next) => update("monthlySpending", next)}
             min={0}
             max={1_000_000}
+            helper={`Annual total: ${format(value.monthlySpending * 12)}`}
           />
         </CollapsibleCategory>
 
@@ -562,6 +688,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
                   holding={holding}
                   index={index}
                   accent={ACCENT.realEstate}
+                  defaultOpen={newlyAddedIds.has(holding.id)}
                   onChange={(patch) => updateHolding(holding.id, patch)}
                   onRemove={() => removeHolding(holding.id)}
                 />
@@ -594,6 +721,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
                 event={event}
                 index={index}
                 accent={ACCENT.assetsDebt}
+                defaultOpen={newlyAddedIds.has(event.id)}
                 yearMin={yearSliderMin}
                 yearMax={yearSliderMax}
                 currentYear={currentYear}
@@ -619,6 +747,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
                 event={event}
                 index={index}
                 accent={ACCENT.realEstate}
+                defaultOpen={newlyAddedIds.has(event.id)}
                 yearMin={yearSliderMin}
                 yearMax={yearSliderMax}
                 currentYear={currentYear}
@@ -644,6 +773,7 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
                 event={event}
                 index={index}
                 accent={ACCENT.debt}
+                defaultOpen={newlyAddedIds.has(event.id)}
                 yearMin={yearSliderMin}
                 yearMax={yearSliderMax}
                 currentYear={currentYear}
@@ -680,68 +810,130 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
   );
 }
 
-type CollapsibleCategoryProps = {
-  title: string;
-  accent: string;
-  icon: ReactNode;
-  summary?: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-};
-
-function CollapsibleCategory({
+// Shared collapsible-pill primitive used by both the top-level category
+// pills (size="lg", e.g. Assets & Debt) and the inner sub-pills
+// (size="sm", e.g. Liquid / Non-Liquid / life-event cards). Visual
+// differences (radius, padding, border softness, legend font, icon slot,
+// chevron placement) collapse to a `size` switch so that behaviour
+// (toggle state, --accent cascade, panel ARIA wiring, summary slot) is
+// authored once. Public wrappers below preserve the original component
+// names so call sites are unchanged.
+function CollapsiblePill({
   title,
-  accent,
   icon,
-  summary,
+  accent,
   defaultOpen = false,
+  testId,
+  summary,
+  size,
   children
-}: CollapsibleCategoryProps) {
+}: {
+  title: string;
+  icon?: ReactNode;
+  accent: string;
+  defaultOpen?: boolean;
+  testId?: string;
+  /** One-line (or multi-line) summary shown below the legend when
+   *  collapsed. Use a ReactNode (e.g. two stacked <div>s) for multi-line. */
+  summary?: ReactNode;
+  size: "lg" | "sm";
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
+  const isLg = size === "lg";
+
+  // Per-size visual deltas. Behaviour is identical across sizes; only
+  // styling changes. Both sizes use the same open/closed vertical
+  // padding asymmetry: tight `pt-1 pb-2` when collapsed so the summary
+  // hugs the legend at a consistent baseline across parent + child
+  // pills, roomier `py-3/4` when open so the body content has air. Only
+  // border-radius and horizontal padding scale down for the child.
+  const verticalPadding = open
+    ? "py-3 md:py-4"
+    : "pb-2 pt-1 md:pb-3 md:pt-1";
+  const fieldsetClass = isLg
+    ? `relative rounded-[1.25rem] border bg-[var(--surface)] px-4 md:px-5 ${verticalPadding}`
+    : `relative rounded-[1rem] border bg-[var(--surface)] px-3 md:px-4 ${verticalPadding}`;
+
+  // Parent pills get a solid accent border; child pills use a softer
+  // 50% mix so they read as nested rather than competing with the
+  // parent's outline.
+  const borderColor = isLg
+    ? accent
+    : `color-mix(in oklab, ${accent} 50%, transparent)`;
+
+  const legendClass = isLg ? "px-1" : "px-1 text-[12px] font-semibold";
+  const legendButtonClass = isLg
+    ? "flex items-center gap-2.5 text-left text-sm font-semibold"
+    : "flex items-center gap-1.5";
+
+  // Both sizes share the same summary class so collapsed child pills
+  // read at the same weight as collapsed parent categories. `block`
+  // (no flex) lets multi-line ReactNode summaries (e.g. New Debt's
+  // headline + schedule line) stack vertically; single-string summaries
+  // render unchanged. `text-center` horizontally centers the summary in
+  // the pill body so it doesn't crowd the top-left legend corner.
+  const summaryClass =
+    "pt-1 text-center text-base font-medium tabular-nums text-[var(--ink-muted)]";
+
   return (
     <fieldset
-      className={`relative rounded-[1.25rem] border bg-[var(--surface)] px-4 md:px-5 ${
-        open ? "py-3 md:py-4" : "pb-2 pt-1 md:pb-3 md:pt-1"
-      }`}
-      // Set --accent on the section container so descendant inputs /
+      className={fieldsetClass}
+      data-testid={testId}
+      // Set --accent on the pill container so descendant inputs /
       // sliders pick up the section's accent in the global :focus rules
       // and slider thumb rules (globals.css). Cascading via CSS custom
       // property keeps the focus highlight context-aware without each
       // input needing to know which section it lives in.
-      style={{ borderColor: accent, ["--accent" as string]: accent } as React.CSSProperties}
+      style={{ borderColor, ["--accent" as string]: accent } as React.CSSProperties}
     >
-      <legend className="px-1">
+      <legend className={legendClass} style={{ color: accent }}>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="flex items-center gap-2.5 text-left text-sm font-semibold"
+          className={legendButtonClass}
           style={{ color: accent }}
         >
-          <span aria-hidden className="inline-flex shrink-0">
-            {icon}
-          </span>
+          {isLg && icon ? (
+            <span aria-hidden className="inline-flex shrink-0">
+              {icon}
+            </span>
+          ) : null}
           <span>{title}</span>
         </button>
       </legend>
+      {/* Decorative top-right chevron toggle, identical positioning for
+          parent + child pills (Task 3). The legend button above is the
+          keyboard / SR toggle (it carries the title as its accessible
+          name); this chevron is `aria-hidden` and out of the tab order
+          so it doesn't duplicate that name in the accessibility tree.
+          Sub-pills use the small chevron so it stays in proportion to
+          the smaller pill and `text-[12px]` legend; parent pills use
+          the default 14px size to match their `text-sm` legend. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-hidden="true"
         tabIndex={-1}
-        className="absolute right-3 top-[-10px] inline-flex items-center bg-[var(--surface)] px-1 leading-none focus:outline-none md:right-4"
+        className={`absolute right-3 ${
+          isLg ? "top-[-10px]" : "top-[-9px]"
+        } inline-flex items-center bg-[var(--surface)] px-1 leading-none focus:outline-none md:right-4`}
         style={{ color: accent, transform: "translateY(-50%)" }}
       >
-        <Chevron open={open} />
+        <Chevron open={open} small={!isLg} />
       </button>
       {open ? (
         <div id={panelId} className="space-y-3 pt-1">
           {children}
         </div>
       ) : summary ? (
-        <div className="flex items-center pt-1 text-base font-medium tabular-nums text-[var(--ink-muted)]">
+        <div
+          data-testid={testId ? `${testId}-summary` : undefined}
+          className={summaryClass}
+        >
           {summary}
         </div>
       ) : null}
@@ -749,55 +941,28 @@ function CollapsibleCategory({
   );
 }
 
-function CollapsibleSubsection({
-  title,
-  accent,
-  defaultOpen = false,
-  testId,
-  children
-}: {
+type CollapsibleCategoryProps = {
+  title: string;
+  accent: string;
+  icon: ReactNode;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+};
+
+function CollapsibleCategory(props: CollapsibleCategoryProps) {
+  return <CollapsiblePill {...props} size="lg" />;
+}
+
+function CollapsibleSubsection(props: {
   title: string;
   accent: string;
   defaultOpen?: boolean;
   testId: string;
+  summary?: ReactNode;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const panelId = useId();
-  // Visual parity with the life-event cards: full-pill border around the
-  // subsection with the title (+ a chevron toggle) sitting in the corner
-  // legend slot. The toggle is a button inside the legend so its
-  // accessible name is the title — existing tests that expand subsections
-  // by clicking `getByRole("button", { name: /title/i })` keep working.
-  return (
-    <fieldset
-      className="relative rounded-[1rem] border bg-[var(--surface)] px-3 py-3 md:px-4"
-      data-testid={testId}
-      style={{
-        borderColor: `color-mix(in oklab, ${accent} 50%, transparent)`,
-        ["--accent" as string]: accent
-      } as React.CSSProperties}
-    >
-      <legend className="px-1 text-[12px] font-semibold" style={{ color: accent }}>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-controls={panelId}
-          className="flex items-center gap-1.5"
-          style={{ color: accent }}
-        >
-          <span>{title}</span>
-          <Chevron open={open} small />
-        </button>
-      </legend>
-      {open ? (
-        <div id={panelId} className="space-y-3 pt-1">
-          {children}
-        </div>
-      ) : null}
-    </fieldset>
-  );
+  return <CollapsiblePill {...props} size="sm" />;
 }
 
 function Chevron({ open, small = false }: { open: boolean; small?: boolean }) {
@@ -822,6 +987,14 @@ function Chevron({ open, small = false }: { open: boolean; small?: boolean }) {
   );
 }
 
+// Per-call wording for the existing-Debt subsection. Hoisted so the
+// in-card paragraph (`DebtScheduleSummary`) and the collapsed-summary
+// line in the Debt subsection always read the same edge-case text.
+const EXISTING_DEBT_SCHEDULE_MESSAGES = {
+  noPrincipal: "No outstanding debt.",
+  termInPast: "Loan end year is in the past — no scheduled payments."
+} as const;
+
 function DebtScheduleSummary({
   value,
   format
@@ -830,29 +1003,20 @@ function DebtScheduleSummary({
   format: (v: number) => string;
 }) {
   const currentYear = new Date().getFullYear();
-  const remainingTerm = Math.max(0, value.debtEndYear - currentYear);
-  const principal = value.startDebt;
-
-  const text = (() => {
-    if (principal <= 0) return "No outstanding debt.";
-    if (remainingTerm <= 0) return "Loan end year is in the past — no scheduled payments.";
-
-    if (value.debtRepaymentType === "overTime") {
-      const annual = computeOverTimeAnnualPayment(principal, value.debtInterestRate, remainingTerm);
-      const yearsLabel = `${remainingTerm} year${remainingTerm === 1 ? "" : "s"}`;
-      return `Annual repayment (capital + interest): ${format(annual)} for ${yearsLabel}.`;
-    }
-
-    const annualInterest = principal * value.debtInterestRate;
-    return `Annual interest payment: ${format(annualInterest)} · Lump sum of ${format(principal)} in ${value.debtEndYear}.`;
-  })();
-
   return (
     <p
       data-testid="debt-schedule-summary"
       className="text-xs leading-relaxed text-[var(--ink-muted)]"
     >
-      {text}
+      {formatDebtScheduleText({
+        principal: value.startDebt,
+        interestRate: value.debtInterestRate,
+        repaymentType: value.debtRepaymentType,
+        startYear: currentYear,
+        endYear: value.debtEndYear,
+        format,
+        messages: EXISTING_DEBT_SCHEDULE_MESSAGES
+      })}
     </p>
   );
 }
@@ -891,6 +1055,7 @@ function RealEstateInvestmentCard({
   event,
   index,
   accent,
+  defaultOpen,
   yearMin,
   yearMax,
   currentYear,
@@ -901,6 +1066,7 @@ function RealEstateInvestmentCard({
   event: RealEstateInvestmentEvent;
   index: number;
   accent: string;
+  defaultOpen: boolean;
   yearMin: number;
   yearMax: number;
   currentYear: number;
@@ -945,17 +1111,13 @@ function RealEstateInvestmentCard({
   };
 
   return (
-    <fieldset
-      className="relative space-y-3 rounded-[1rem] border bg-[var(--surface)] px-3 py-3 md:px-4"
-      style={{
-        borderColor: `color-mix(in oklab, ${accent} 50%, transparent)`,
-        ["--accent" as string]: accent
-      } as React.CSSProperties}
-      data-testid={`re-investment-card-${index}`}
+    <CollapsibleSubsection
+      title={`Real Estate Investment ${index + 1}`}
+      accent={accent}
+      defaultOpen={defaultOpen}
+      testId={`re-investment-card-${index}`}
+      summary={summarizeRealEstateInvestmentCard(event, inflatedPurchaseAmount, format)}
     >
-      <legend className="px-1 text-[12px] font-semibold" style={{ color: accent }}>
-        Real Estate Investment {index + 1}
-      </legend>
       <CurrencyField
         label="Purchase amount"
         value={event.purchaseAmount}
@@ -1011,7 +1173,7 @@ function RealEstateInvestmentCard({
           Remove
         </button>
       </div>
-    </fieldset>
+    </CollapsibleSubsection>
   );
 }
 
@@ -1019,6 +1181,7 @@ function WindfallEventCard({
   event,
   index,
   accent,
+  defaultOpen,
   yearMin,
   yearMax,
   currentYear,
@@ -1029,6 +1192,7 @@ function WindfallEventCard({
   event: WindfallEvent;
   index: number;
   accent: string;
+  defaultOpen: boolean;
   yearMin: number;
   yearMax: number;
   currentYear: number;
@@ -1055,17 +1219,13 @@ function WindfallEventCard({
   };
 
   return (
-    <fieldset
-      className="relative space-y-3 rounded-[1rem] border bg-[var(--surface)] px-3 py-3 md:px-4"
-      style={{
-        borderColor: `color-mix(in oklab, ${accent} 50%, transparent)`,
-        ["--accent" as string]: accent
-      } as React.CSSProperties}
-      data-testid={`windfall-card-${index}`}
+    <CollapsibleSubsection
+      title={`Windfall ${index + 1}`}
+      accent={accent}
+      defaultOpen={defaultOpen}
+      testId={`windfall-card-${index}`}
+      summary={summarizeWindfallCard(event, inflatedAmount, format)}
     >
-      <legend className="px-1 text-[12px] font-semibold" style={{ color: accent }}>
-        Windfall {index + 1}
-      </legend>
       <CurrencyField
         label="Amount"
         value={event.amount}
@@ -1104,7 +1264,7 @@ function WindfallEventCard({
           Remove
         </button>
       </div>
-    </fieldset>
+    </CollapsibleSubsection>
   );
 }
 
@@ -1112,6 +1272,7 @@ function NewDebtEventCard({
   event,
   index,
   accent,
+  defaultOpen,
   yearMin,
   yearMax,
   currentYear,
@@ -1122,6 +1283,7 @@ function NewDebtEventCard({
   event: NewDebtEvent;
   index: number;
   accent: string;
+  defaultOpen: boolean;
   yearMin: number;
   yearMax: number;
   currentYear: number;
@@ -1169,17 +1331,21 @@ function NewDebtEventCard({
   };
 
   return (
-    <fieldset
-      className="relative space-y-3 rounded-[1rem] border bg-[var(--surface)] px-3 py-3 md:px-4"
-      style={{
-        borderColor: `color-mix(in oklab, ${accent} 50%, transparent)`,
-        ["--accent" as string]: accent
-      } as React.CSSProperties}
-      data-testid={`new-debt-card-${index}`}
+    <CollapsibleSubsection
+      title={`New Debt ${index + 1}`}
+      accent={accent}
+      defaultOpen={defaultOpen}
+      testId={`new-debt-card-${index}`}
+      // Two-line collapsed summary: headline (principal + start year)
+      // on top, schedule helper (same text the in-card paragraph shows)
+      // below, so the user can scan both at a glance without expanding.
+      summary={
+        <>
+          <div>{summarizeNewDebtCard(event, inflatedPrincipal, format)}</div>
+          <div>{formatNewDebtScheduleText(event, inflatedPrincipal, format)}</div>
+        </>
+      }
     >
-      <legend className="px-1 text-[12px] font-semibold" style={{ color: accent }}>
-        New Debt {index + 1}
-      </legend>
       <CurrencyField
         label="Principal"
         value={event.principal}
@@ -1253,15 +1419,76 @@ function NewDebtEventCard({
           Remove
         </button>
       </div>
-    </fieldset>
+    </CollapsibleSubsection>
   );
 }
 
-// Mirrors `DebtScheduleSummary` (the one under the top-level Debt
-// subsection) but keyed off a single new-debt event. The principal we
-// schedule on is the inflated principal — what the engine actually
+// Single source of truth for every "debt schedule helper" line in the
+// form. Three call sites read from this:
+//   1. `DebtScheduleSummary`          — in-card paragraph for the
+//      existing-Debt subsection.
+//   2. `NewDebtScheduleSummary`       — in-card paragraph for each
+//      New Debt life-event card (via `formatNewDebtScheduleText`).
+//   3. The collapsed-summary line     — both the existing-Debt
+//      subsection and each collapsed New Debt card.
+// Edge-case wording differs between existing-debt and new-debt
+// contexts ("No outstanding debt." vs "No principal entered.", etc.),
+// so callers pass per-call `messages`. The success branches are
+// identical across all three.
+function formatDebtScheduleText(args: {
+  principal: number;
+  interestRate: number;
+  repaymentType: DebtRepaymentType;
+  startYear: number;
+  endYear: number;
+  format: (n: number) => string;
+  messages: { noPrincipal: string; termInPast: string };
+}): string {
+  const {
+    principal,
+    interestRate,
+    repaymentType,
+    startYear,
+    endYear,
+    format,
+    messages
+  } = args;
+  const term = Math.max(0, endYear - startYear);
+  if (principal <= 0) return messages.noPrincipal;
+  if (term <= 0) return messages.termInPast;
+  if (repaymentType === "overTime") {
+    const annual = computeOverTimeAnnualPayment(principal, interestRate, term);
+    const yearsLabel = `${term} year${term === 1 ? "" : "s"}`;
+    return `Annual repayment (capital + interest): ${format(annual)} for ${yearsLabel}.`;
+  }
+  const annualInterest = principal * interestRate;
+  return `Annual interest payment: ${format(annualInterest)} · Lump sum of ${format(principal)} in ${endYear}.`;
+}
+
+// Thin adapter for the New Debt life-event card. The "principal" it
+// schedules on is the inflated principal — what the engine actually
 // disburses at `startYear` — so the displayed payment matches the cash
 // flow the user will see in the chart in nominal terms.
+function formatNewDebtScheduleText(
+  event: NewDebtEvent,
+  inflatedPrincipal: number,
+  format: (n: number) => string
+): string {
+  return formatDebtScheduleText({
+    principal: inflatedPrincipal,
+    interestRate: event.interestRate,
+    repaymentType: event.repaymentType,
+    startYear: event.startYear,
+    endYear: event.endYear,
+    format,
+    messages: {
+      noPrincipal: "No principal entered.",
+      termInPast:
+        "End year is at or before start year — no scheduled payments."
+    }
+  });
+}
+
 function NewDebtScheduleSummary({
   event,
   index,
@@ -1273,33 +1500,12 @@ function NewDebtScheduleSummary({
   inflatedPrincipal: number;
   format: (v: number) => string;
 }) {
-  const term = Math.max(0, event.endYear - event.startYear);
-
-  const text = (() => {
-    if (inflatedPrincipal <= 0) return "No principal entered.";
-    if (term <= 0)
-      return "End year is at or before start year — no scheduled payments.";
-
-    if (event.repaymentType === "overTime") {
-      const annual = computeOverTimeAnnualPayment(
-        inflatedPrincipal,
-        event.interestRate,
-        term
-      );
-      const yearsLabel = `${term} year${term === 1 ? "" : "s"}`;
-      return `Annual repayment (capital + interest): ${format(annual)} for ${yearsLabel}.`;
-    }
-
-    const annualInterest = inflatedPrincipal * event.interestRate;
-    return `Annual interest payment: ${format(annualInterest)} · Lump sum of ${format(inflatedPrincipal)} in ${event.endYear}.`;
-  })();
-
   return (
     <p
       data-testid={`new-debt-schedule-summary-${index}`}
       className="text-xs leading-relaxed text-[var(--ink-muted)]"
     >
-      {text}
+      {formatNewDebtScheduleText(event, inflatedPrincipal, format)}
     </p>
   );
 }
@@ -1308,15 +1514,18 @@ function RealEstateHoldingCard({
   holding,
   index,
   accent,
+  defaultOpen,
   onChange,
   onRemove
 }: {
   holding: RealEstateHolding;
   index: number;
   accent: string;
+  defaultOpen: boolean;
   onChange: (patch: Partial<RealEstateHolding>) => void;
   onRemove: () => void;
 }) {
+  const { format } = useCurrency();
   const appreciationRateSpec: SliderSpec = {
     key: "holdingAppreciationRate",
     label: "Annual appreciation rate",
@@ -1336,17 +1545,13 @@ function RealEstateHoldingCard({
   };
 
   return (
-    <fieldset
-      className="relative space-y-3 rounded-[1rem] border bg-[var(--surface)] px-3 py-3 md:px-4"
-      style={{
-        borderColor: `color-mix(in oklab, ${accent} 50%, transparent)`,
-        ["--accent" as string]: accent
-      } as React.CSSProperties}
-      data-testid={`re-holding-card-${index}`}
+    <CollapsibleSubsection
+      title={`Real Estate ${index + 1}`}
+      accent={accent}
+      defaultOpen={defaultOpen}
+      testId={`re-holding-card-${index}`}
+      summary={summarizeRealEstateHoldingCard(holding, format)}
     >
-      <legend className="px-1 text-[12px] font-semibold" style={{ color: accent }}>
-        Real Estate {index + 1}
-      </legend>
       <CurrencyField
         label="Value"
         value={holding.value}
@@ -1381,7 +1586,7 @@ function RealEstateHoldingCard({
           Remove
         </button>
       </div>
-    </fieldset>
+    </CollapsibleSubsection>
   );
 }
 

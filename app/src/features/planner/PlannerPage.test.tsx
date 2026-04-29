@@ -102,6 +102,8 @@ describe("PlannerPage", () => {
     // The default plan ships with startAssets=10K earning 5%, which counts
     // as portfolio cash flow under the new ratio. Zero it out so total
     // inflows really are zero and the footnote falls back to em-dash.
+    // Liquid sub-pill is collapsed by default; expand to reach the field.
+    await user.click(screen.getByRole("button", { name: /^Liquid$/i }));
     const portfolio = screen.getByLabelText("Financial Assets / Portfolio") as HTMLInputElement;
     await user.clear(portfolio);
     await user.type(portfolio, "0");
@@ -275,6 +277,8 @@ describe("PlannerPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    // Liquid sub-pill is collapsed by default; expand to reach Cash Balance.
+    await user.click(screen.getByRole("button", { name: /^Liquid$/i }));
     const cashField = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(cashField);
     await user.type(cashField, "999999");
@@ -307,6 +311,8 @@ describe("PlannerPage", () => {
     // balance to give the projection something to work with. Inflation is
     // already 2% by default, which is enough to make the real and future
     // views diverge.
+    // Liquid sub-pill is collapsed by default; expand to reach Cash Balance.
+    await user.click(screen.getByRole("button", { name: /^Liquid$/i }));
     const cashField = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(cashField);
     await user.type(cashField, "100000");
@@ -353,6 +359,8 @@ describe("PlannerPage", () => {
 
     // Zero out the portfolio, cash, and salary so spending outpaces income and
     // the combined liquid position is forced negative within the horizon.
+    // Liquid sub-pill is collapsed by default; expand to reach the fields.
+    await user.click(screen.getByRole("button", { name: /^Liquid$/i }));
     const portfolio = screen.getByLabelText("Financial Assets / Portfolio") as HTMLInputElement;
     await user.clear(portfolio);
     await user.type(portfolio, "0");
@@ -391,6 +399,8 @@ describe("PlannerPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    // Liquid sub-pill is collapsed by default; expand to reach Cash Balance.
+    await user.click(screen.getByRole("button", { name: /^Liquid$/i }));
     const cashField = screen.getByLabelText("Cash Balance") as HTMLInputElement;
     await user.clear(cashField);
     await user.type(cashField, "123456");
@@ -398,6 +408,8 @@ describe("PlannerPage", () => {
     expect(cashField.value).toBe("123,456");
 
     await user.click(screen.getByRole("button", { name: /reset to defaults/i }));
+    // Reset doesn't re-collapse the pill (open/closed is local UI state in
+    // PlannerForm, untouched by onReset), so Cash Balance is still in the DOM.
     expect((screen.getByLabelText("Cash Balance") as HTMLInputElement).value).toBe(
       new Intl.NumberFormat("en-US").format(DEFAULT_PLAN_INPUTS.cashBalance)
     );
