@@ -1304,7 +1304,7 @@ describe("New debt events", () => {
     ).toBeInTheDocument();
   });
 
-  it("adds a card with Principal + interest rate + repayment + start year + end year when Add is clicked", async () => {
+  it("adds a card with Principal + interest rate + repayment + a single dual-handle Loan period range slider when Add is clicked", async () => {
     const user = userEvent.setup();
     render(<Host />);
     await expand(/life events/i);
@@ -1315,14 +1315,30 @@ describe("New debt events", () => {
     expect(
       within(card).getByLabelText(/repayment type for new debt 1/i)
     ).toBeInTheDocument();
-    expect(within(card).getByText("Start year")).toBeInTheDocument();
-    expect(within(card).getByText("Loan end year")).toBeInTheDocument();
-    // Defaults: principal 0, startYear current+5, endYear current+10.
+    // The two old "Start year" / "Loan end year" sliders collapse to a
+    // single "Loan period" range slider with two thumbs.
+    expect(within(card).getByText("Loan period")).toBeInTheDocument();
+    expect(within(card).queryByText("Start year")).toBeNull();
+    expect(within(card).queryByText("Loan end year")).toBeNull();
+    // Two thumbs (Radix Slider exposes role="slider" per thumb), plus
+    // the existing Annual interest rate single-handle slider = 3 total.
+    const sliders = within(card).getAllByRole("slider");
+    expect(sliders).toHaveLength(3);
+    expect(
+      within(card).getByLabelText(/start year for new debt 1/i)
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByLabelText(/loan end year for new debt 1/i)
+    ).toBeInTheDocument();
+    // Defaults: principal 0, startYear current+5, endYear current+10
+    // → helpers carry the relative-time prefix when principal is 0.
+    expect(within(card).getByText(/^Start: in 5 years$/)).toBeInTheDocument();
+    expect(within(card).getByText(/^End: in 10 years$/)).toBeInTheDocument();
     const principal = within(card).getByLabelText("Principal") as HTMLInputElement;
     expect(principal.value).toBe("0");
   });
 
-  it("renders the end-year label as 'Lump sum repayment year' when repayment is inFine", async () => {
+  it("swaps the End helper prefix to 'Lump sum repayment:' (and the end-thumb aria-label to 'Lump sum repayment year') when repayment is set to inFine", async () => {
     const user = userEvent.setup();
     render(<Host />);
     await expand(/life events/i);
@@ -1332,10 +1348,46 @@ describe("New debt events", () => {
       /repayment type for new debt 1/i
     ) as HTMLSelectElement;
     await user.selectOptions(select, "inFine");
+    // Helper text under the slider gets the inFine prefix; the Start helper
+    // is still present and unaffected.
     expect(
-      within(card).getByText("Lump sum repayment year")
+      within(card).getByText(/^Lump sum repayment: in 10 years$/)
     ).toBeInTheDocument();
-    expect(within(card).queryByText("Loan end year")).toBeNull();
+    expect(within(card).queryByText(/^End: /)).toBeNull();
+    expect(within(card).getByText(/^Start: in 5 years$/)).toBeInTheDocument();
+    // Per-thumb aria-label also swaps so screen readers announce the
+    // new semantic role of the second handle.
+    expect(
+      within(card).getByLabelText(/lump sum repayment year for new debt 1/i)
+    ).toBeInTheDocument();
+    expect(
+      within(card).queryByLabelText(/loan end year for new debt 1/i)
+    ).toBeNull();
+  });
+
+  it("enforces start <= end on the Loan period range slider (the start thumb cannot cross the end thumb)", async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    await expand(/life events/i);
+    await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
+    const card = screen.getByTestId("new-debt-card-0");
+    // Defaults: startYear = current+5, endYear = current+10 → 5 steps
+    // between thumbs. Pressing ArrowRight on the start thumb 50 times
+    // should advance it up to the end thumb's value but not past it
+    // (Radix's default with minStepsBetweenThumbs=0 clamps at equality).
+    const startThumb = within(card).getByLabelText(
+      /start year for new debt 1/i
+    );
+    const endThumb = within(card).getByLabelText(/loan end year for new debt 1/i);
+    const endValue = Number(endThumb.getAttribute("aria-valuenow"));
+    expect(endValue).toBeGreaterThan(0);
+    startThumb.focus();
+    for (let i = 0; i < 50; i++) {
+      await user.keyboard("{ArrowRight}");
+    }
+    const finalStartValue = Number(startThumb.getAttribute("aria-valuenow"));
+    expect(finalStartValue).toBeLessThanOrEqual(endValue);
+    expect(finalStartValue).toBe(endValue);
   });
 
   it("stacks multiple new-debt cards independently", async () => {
@@ -1413,19 +1465,20 @@ describe("New debt events", () => {
     await user.type(principal, "100000");
     await user.tab();
 
-    expect(within(card).getByText(/in 5 years/i)).toBeInTheDocument();
-    // The inflated amount appears in the helper line; assert a substring of
-    // the rounded value (locale formatting may vary on the symbol/separator).
-    expect(within(card).getByText(/110/)).toBeInTheDocument();
+    // Helper line keeps the "Start:" prefix and combines the inflated
+    // value with the relative-time phrase, e.g. "Start: €110K in 5 years".
+    expect(
+      within(card).getByText(/^Start: .*11.*in 5 years$/)
+    ).toBeInTheDocument();
   });
 
-  it("falls back to just the relative phrase in the Start year helper when principal is 0", async () => {
+  it("falls back to 'Start: <relative phrase>' (no currency) in the Start helper when principal is 0", async () => {
     const user = userEvent.setup();
     render(<Host />);
     await expand(/life events/i);
     await user.click(screen.getByRole("button", { name: /^\+ add new debt$/i }));
     const card = screen.getByTestId("new-debt-card-0");
-    expect(within(card).getByText("in 5 years")).toBeInTheDocument();
+    expect(within(card).getByText("Start: in 5 years")).toBeInTheDocument();
   });
 
   it("renders a two-line collapsed summary on the New Debt card: headline (inflated principal + start year) on top, schedule helper line below", async () => {

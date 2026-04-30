@@ -12,6 +12,7 @@ Architecture documentation: see [`docs/architecture.md`](docs/architecture.md) (
 
 - **Next.js 15** (App Router) + TypeScript + Tailwind v4
 - **Recharts** for all interactive visualizations
+- **Radix UI** (`@radix-ui/react-slider`) for the accessible dual-handle range slider on the New Debt life-event card
 - **Supabase** (EU / Frankfurt) — Postgres + Auth + RLS
 - **Stripe** — subscription billing (M4)
 - **Sentry** (EU region) — error and performance monitoring
