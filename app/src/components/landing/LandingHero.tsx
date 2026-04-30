@@ -41,19 +41,20 @@ export function LandingHero() {
           {/* Eyebrow */}
           <div className="inline-flex items-center gap-2 rounded-full bg-[var(--teal)]/10 px-4 py-1.5 text-sm font-medium text-[var(--teal)]">
             <SparklesIcon />
-            Free to use, no account required
+            A calmer way to plan
           </div>
 
           {/* Main headline */}
           <h1 className="mt-8 font-display text-4xl leading-[1.1] tracking-tight text-[var(--navy)] sm:text-5xl md:text-6xl lg:text-7xl text-balance">
-            Build Financial Plans{" "}
-            <span className="text-[var(--teal)]">You Love</span>
+            Plan the retirement you{" "}
+            <em className="italic text-[var(--navy-soft)]">actually</em>{" "}
+            want.
           </h1>
 
           {/* Subheadline */}
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[var(--ink-soft)] md:text-xl">
-            Simulate your financial future and chart a course toward your best life. 
-            Interactive projections with real-time updates - your data stays on your device.
+            Drag a few sliders, watch your net worth projection change in real time. Your numbers
+            stay on your device &mdash; no account, no tracking, no noise.
           </p>
 
           {/* CTA buttons */}
@@ -62,14 +63,14 @@ export function LandingHero() {
               href="/"
               className="btn-primary text-base px-8 py-3"
             >
-              Start planning for free
+              Start planning
               <span aria-hidden className="ml-2">&rarr;</span>
             </Link>
             <a
               href="#how-it-works"
               className="inline-flex items-center gap-2 text-base font-medium text-[var(--ink-soft)] hover:text-[var(--navy)] transition-colors"
             >
-              See how it works
+              How it works
             </a>
           </div>
 

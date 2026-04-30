@@ -1,24 +1,19 @@
 const features = [
   { icon: "chart", label: "Net worth projections", color: "teal" },
-  { icon: "fire", label: "Calculate FIRE date", color: "coral" },
-  { icon: "home", label: "Plan for buying a home", color: "navy" },
-  { icon: "briefcase", label: "Model going part-time", color: "gold" },
-  { icon: "plane", label: "Take time off for travel", color: "teal" },
-  { icon: "lock", label: "No account required", color: "coral" },
-  { icon: "trending", label: "Investment scenarios", color: "navy" },
-  { icon: "building", label: "Model rental income", color: "gold" },
-  { icon: "calculator", label: "More than a calculator", color: "teal" },
-  { icon: "dollar", label: "Cash-flow visualization", color: "coral" },
-  { icon: "scissors", label: "Tax planning insights", color: "navy" },
-  { icon: "shield", label: "Privacy-friendly", color: "gold" },
-  { icon: "heart", label: "Free to get started", color: "teal" },
-  { icon: "globe", label: "Multiple currencies", color: "coral" },
-  { icon: "users", label: "Plan as a couple", color: "navy" },
-  { icon: "target", label: "Goal tracking", color: "gold" },
-  { icon: "clock", label: "Time to FI calculator", color: "teal" },
-  { icon: "chart-bar", label: "Asset allocation", color: "coral" },
-  { icon: "refresh", label: "What-if scenarios", color: "navy" },
-  { icon: "download", label: "Export your data", color: "gold" },
+  { icon: "dollar", label: "Year-by-year cash flow", color: "coral" },
+  { icon: "refresh", label: "Inflation-adjusted view", color: "navy" },
+  { icon: "percent", label: "Portfolio growth rates", color: "coral" },
+  { icon: "globe", label: "Multiple currencies", color: "gold" },
+  { icon: "home", label: "Stackable real estate", color: "teal" },
+  { icon: "building", label: "Rental income per property", color: "coral" },
+  { icon: "percent", label: "Real estate appreciation rates", color: "gold" },
+  { icon: "trending", label: "Future windfalls", color: "navy" },
+  { icon: "calculator", label: "Custom debt schedules", color: "gold" },
+  { icon: "bell", label: "Liquidity warnings", color: "coral" },
+  { icon: "target", label: "Pick your projection horizon", color: "teal" },
+  { icon: "clock", label: "Live updates as you type", color: "coral" },
+  { icon: "lock", label: "Saved locally, no account", color: "navy" },
+  { icon: "download", label: "Export your plan to file", color: "gold" },
 ];
 
 function FeatureIcon({ icon, color }: { icon: string; color: string }) {
@@ -32,26 +27,10 @@ function FeatureIcon({ icon, color }: { icon: string; color: string }) {
         <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     ),
-    fire: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z" />
-      </svg>
-    ),
     home: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
         <polyline points="9 22 9 12 15 12 15 22" />
-      </svg>
-    ),
-    briefcase: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-        <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" />
-      </svg>
-    ),
-    plane: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
       </svg>
     ),
     lock: (
@@ -93,37 +72,11 @@ function FeatureIcon({ icon, color }: { icon: string; color: string }) {
         <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
       </svg>
     ),
-    scissors: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <circle cx="6" cy="6" r="3" />
-        <circle cx="6" cy="18" r="3" />
-        <line x1="20" y1="4" x2="8.12" y2="15.88" />
-        <line x1="14.47" y1="14.48" x2="20" y2="20" />
-        <line x1="8.12" y1="8.12" x2="12" y2="12" />
-      </svg>
-    ),
-    shield: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-    ),
-    heart: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-      </svg>
-    ),
     globe: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
         <circle cx="12" cy="12" r="10" />
         <line x1="2" y1="12" x2="22" y2="12" />
         <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-      </svg>
-    ),
-    users: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
       </svg>
     ),
     target: (
@@ -139,13 +92,6 @@ function FeatureIcon({ icon, color }: { icon: string; color: string }) {
         <polyline points="12 6 12 12 16 14" />
       </svg>
     ),
-    "chart-bar": (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
-        <line x1="12" y1="20" x2="12" y2="10" />
-        <line x1="18" y1="20" x2="18" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="16" />
-      </svg>
-    ),
     refresh: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
         <polyline points="23 4 23 10 17 10" />
@@ -158,6 +104,19 @@ function FeatureIcon({ icon, color }: { icon: string; color: string }) {
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+    percent: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round">
+        <line x1="19" y1="5" x2="5" y2="19" />
+        <circle cx="6.5" cy="6.5" r="2.5" />
+        <circle cx="17.5" cy="17.5" r="2.5" />
+      </svg>
+    ),
+    bell: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colorVar} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 01-3.46 0" />
       </svg>
     ),
   };

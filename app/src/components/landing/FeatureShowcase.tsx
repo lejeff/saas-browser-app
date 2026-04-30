@@ -312,28 +312,28 @@ export function FeatureShowcase() {
         <div className="space-y-20 md:space-y-32">
           <FeatureBlock
             icon={<ChartBarIcon />}
-            eyebrow="Plan with nuance"
-            title="Capture the details that matter"
-            description="Most retirement calculators miss the important details in life. Financial Planner makes it easy and intuitive to build rich financial plans that truly represent you and your goals."
+            eyebrow="Built around real life"
+            title="Plan around the moments that move the needle"
+            description="Most calculators hand you one number and call it a day. Drop in the windfalls, the years you go part-time, the property you might buy at forty — and watch each choice reshape the projection in front of you."
             benefits={[
-              "Define milestones that matter to you",
-              "Plan for financial independence and other goals",
-              "Gauge your chance of success with simulations",
-              "Reduce anxiety around your finances"
+              "Add the moments worth planning around",
+              "Pick a target age, a number, or both",
+              "See how each tweak ripples through the chart",
+              "Trade vague money worry for a concrete plan"
             ]}
             visual={<PlanWithNuanceVisual />}
           />
 
           <FeatureBlock
             icon={<EyeIcon />}
-            eyebrow="Visualize your future"
+            eyebrow="See the whole arc"
             title="See the full picture"
-            description="Build a living model of your whole life's finances and discover the spectrum of possible outcomes. Identify trade-offs and experiment with different strategies."
+            description="One chart shows the entire run — today's balance, tomorrow's spending, the year your salary stops. Adjust an input and the projection updates in place, so trade-offs feel concrete instead of theoretical."
             benefits={[
-              "Drill into each simulated year in detail",
-              "Analyze estimated taxes and cash-flow",
-              "Model estate planning and legacy",
-              "Figure out how to live life on your terms"
+              "Hover any year to see what's driving the bar",
+              "Watch cash flow shift as life events land",
+              "Plan for what you leave behind",
+              "Test scenarios before you commit to them"
             ]}
             visual={<VisualizeVisual />}
             reversed
@@ -343,7 +343,7 @@ export function FeatureShowcase() {
             icon={<LockIcon />}
             eyebrow="Privacy first"
             title="Your data stays yours"
-            description="Financial Planner has no link to your real financial accounts and gives you control of how your data is stored. Your information never leaves your device."
+            description="We don't connect to your bank, your brokerage, or anything else. Every number you type stays in your browser, and you decide what happens to it."
             benefits={[
               "No account required to get started",
               "Data stored locally in your browser",
@@ -357,12 +357,12 @@ export function FeatureShowcase() {
             icon={<TrendingIcon />}
             eyebrow="Track progress"
             title="Watch your wealth grow"
-            description="Journal and visualize your actual progress over time. Compare against your initial projections and celebrate your wins."
+            description="Plug in your real numbers as the years pass and see how the actual path lines up with the projection you started from."
             benefits={[
-              "Track net worth over time",
-              "Compare actual vs. projected growth",
-              "See trends and patterns in your finances",
-              "Stay motivated on your journey"
+              "Track net worth year over year",
+              "Compare actual vs projected growth",
+              "Spot trends early",
+              "Stay grounded as the picture sharpens"
             ]}
             visual={<ProgressVisual />}
             reversed
