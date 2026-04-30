@@ -65,9 +65,6 @@ export function LandingHeader() {
           <a href="#pricing" className="transition-colors hover:text-[var(--navy)]">
             Pricing
           </a>
-          <a href="#testimonials" className="transition-colors hover:text-[var(--navy)]">
-            Testimonials
-          </a>
           <a href="/" className="transition-colors hover:text-[var(--navy)]">
             Try it free
           </a>
@@ -114,13 +111,6 @@ export function LandingHeader() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Pricing
-            </a>
-            <a
-              href="#testimonials"
-              className="text-base font-medium text-[var(--ink-soft)] hover:text-[var(--navy)]"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Testimonials
             </a>
             <a
               href="/"
