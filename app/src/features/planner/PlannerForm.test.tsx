@@ -30,6 +30,32 @@ async function expand(name: RegExp | string) {
   await user.click(screen.getByRole("button", { name }));
 }
 
+// Find the deepest element whose flattened textContent matches `regex`.
+// Useful for asserting on collapsed-pill summary text after the V2-C
+// restyle, which renders value + label as two adjacent <span>s with
+// only `gap-x-2` visual separation. `getByText`'s default per-text-node
+// matching can't see across siblings, so we walk down to the most
+// specific element that matches the joined text.
+function getElementByJoinedText(regex: RegExp): HTMLElement {
+  return screen.getByText((_, el) => {
+    if (!el) return false;
+    if (!regex.test(el.textContent ?? "")) return false;
+    return !Array.from(el.children).some((c) =>
+      regex.test(c.textContent ?? "")
+    );
+  });
+}
+
+function queryElementByJoinedText(regex: RegExp): HTMLElement | null {
+  return screen.queryByText((_, el) => {
+    if (!el) return false;
+    if (!regex.test(el.textContent ?? "")) return false;
+    return !Array.from(el.children).some((c) =>
+      regex.test(c.textContent ?? "")
+    );
+  });
+}
+
 beforeEach(() => {
   window.localStorage.clear();
 });
@@ -117,7 +143,10 @@ describe("PlannerForm layout", () => {
     // convention as the parent Assets and Debt pill, which always shows
     // the rate even when net is 0.
     const summary = screen.getByTestId("subsection-liquid-summary");
-    expect(summary.textContent).toBe("— · 5.0% return on Portfolio");
+    // After the V2-C restyle the value and label render as two spans
+    // separated visually by `gap-x-2` (CSS, not a literal middle-dot),
+    // so textContent concatenates the two segments directly.
+    expect(summary.textContent).toBe("—5.0% return on Portfolio");
   });
 
   it("Non-Liquid subsection shows an em-dash in its collapsed-state summary when both buckets are zero (default fixture)", async () => {
@@ -128,18 +157,20 @@ describe("PlannerForm layout", () => {
     expect(summary.textContent).toBe("—");
   });
 
-  it("Debt subsection's default-state summary is two lines: em-dash headline and 'No outstanding debt.'", async () => {
+  it("Debt subsection's default-state summary surfaces both segments: em-dash value and 'No outstanding debt.' label", async () => {
     render(<Host />);
     // Debt defaults to closed; the collapsed summary is visible immediately.
+    // After the V2-C restyle the summary is one flex container with two
+    // spans (value + label) joined by " · ", so we assert against the
+    // flattened textContent rather than against per-line <div>s.
     const summary = screen.getByTestId("subsection-debt-summary");
-    const lines = Array.from(summary.querySelectorAll("div"));
-    expect(lines).toHaveLength(2);
-    // Line 1: empty-bucket fallback, since startDebt defaults to 0.
-    expect(lines[0]!.textContent).toBe("—");
-    // Line 2: existing-debt edge-case wording (NOT the new-debt wording
-    // "No principal entered.") — verifies the per-call `messages`
-    // override on the shared `formatDebtScheduleText` helper.
-    expect(lines[1]!.textContent).toBe("No outstanding debt.");
+    // Em-dash empty-bucket fallback (startDebt defaults to 0) followed
+    // directly by the existing-debt edge-case wording — NOT the new-
+    // debt wording ("No principal entered."), verifying the per-call
+    // `messages` override on `formatDebtScheduleText`. The two spans
+    // are separated visually by `gap-x-2` rather than a literal " · "
+    // character, so textContent concatenates them with no separator.
+    expect(summary.textContent).toBe("—No outstanding debt.");
   });
 
   it("Debt subsection's collapsed summary surfaces the same schedule text as the in-card paragraph once a principal is entered", async () => {
@@ -162,16 +193,18 @@ describe("PlannerForm layout", () => {
     ).textContent!;
     expect(inCardSchedule).toMatch(/Annual repayment|Annual interest/);
 
-    // Collapse Debt to inspect the collapsed summary.
+    // Collapse Debt to inspect the collapsed summary. Post V2-C the
+    // summary is one flex container with a value span + label span
+    // separated visually by `gap-x-2` (no literal " · " in the DOM),
+    // so we assert against the flattened textContent.
     await user.click(screen.getByRole("button", { name: /^Debt$/i }));
     const summary = screen.getByTestId("subsection-debt-summary");
-    const lines = Array.from(summary.querySelectorAll("div"));
-    expect(lines).toHaveLength(2);
-    // Line 1: balance only (no "from <year>" — your spec). Locale
-    // formatting varies, assert a substring of 100,000.
-    expect(lines[0]!.textContent).toMatch(/100/);
-    // Line 2: identical to the in-card paragraph.
-    expect(lines[1]!.textContent).toBe(inCardSchedule);
+    // Value: balance only (no "from <year>" — your spec). Locale
+    // formatting varies, so assert a substring of 100,000.
+    expect(summary.textContent).toMatch(/100/);
+    // Label: identical to the in-card paragraph (the schedule helper
+    // text is appended verbatim after the value span).
+    expect(summary.textContent).toContain(inCardSchedule);
   });
 
   it("renders the Debt subsection with the coral (debt-lane) accent, distinct from the teal Liquid/Non-Liquid lanes", async () => {
@@ -594,8 +627,13 @@ describe("PlannerForm layout", () => {
     // hard-coding the currency symbol because the default depends on the
     // locale set by CurrencyProvider. Defaults are zero, so each summary
     // reflects an empty plan.
+    // After V2-C, the value span ("…0/yr income") and label span
+    // ("…0/mo expenses") render side-by-side without a literal " · "
+    // between them — visual separation comes from `gap-x-2`. Use the
+    // joined-text helper because `getByText` won't match across two
+    // adjacent text nodes.
     expect(
-      screen.getByText(/.{1,3}0\/yr income · .{1,3}0\/mo expenses/)
+      getElementByJoinedText(/.{1,3}0\/yr income.{1,3}0\/mo expenses/)
     ).toBeInTheDocument();
     // Real estate summary is the em-dash placeholder when both values are 0.
     // Scope to the Real Estate category fieldset since other empty
@@ -609,15 +647,19 @@ describe("PlannerForm layout", () => {
   it("hides a category's summary while it is expanded and shows it once collapsed", async () => {
     const user = userEvent.setup();
     render(<Host />);
-    // Assets and Debt starts open, so its 'Net' summary should not be in the DOM.
+    // Assets and Debt starts open, so its 'Net' summary should not be
+    // in the DOM. Post V2-C the value + label spans render with
+    // visual `gap-x-2` separation rather than a literal middle-dot,
+    // so the regex matches the concatenated textContent of the
+    // summary div via the joined-text helper.
     expect(
-      screen.queryByText(/^Net .{1,3}10K · 5\.0% return on Portfolio$/)
+      queryElementByJoinedText(/^Net .{1,3}10K5\.0% return on Portfolio$/)
     ).toBeNull();
     // Collapse it; the summary should appear in its header row, including
     // the Expected annual return appended after the net headline.
     await user.click(screen.getByRole("button", { name: /assets and debt/i }));
     expect(
-      screen.getByText(/^Net .{1,3}10K · 5\.0% return on Portfolio$/)
+      getElementByJoinedText(/^Net .{1,3}10K5\.0% return on Portfolio$/)
     ).toBeInTheDocument();
   });
 
@@ -633,8 +675,12 @@ describe("PlannerForm layout", () => {
     const slider = screen.getByLabelText("Expected annual return") as HTMLInputElement;
     fireEvent.change(slider, { target: { value: "0.07" } });
     await user.click(screen.getByRole("button", { name: /assets and debt/i }));
+    // Post V2-C the value + label spans render with visual `gap-x-2`
+    // separation rather than a literal middle-dot, so the regex
+    // matches the concatenated textContent of the summary div via
+    // the joined-text helper.
     expect(
-      screen.getByText(/^Net .{1,3}10K · 7\.0% return on Portfolio$/)
+      getElementByJoinedText(/^Net .{1,3}10K7\.0% return on Portfolio$/)
     ).toBeInTheDocument();
   });
 
@@ -939,9 +985,16 @@ describe("Real estate investment events", () => {
       screen.getByRole("button", { name: /add real estate investment/i })
     );
 
+    // Post V2-C the value + label spans render with visual `gap-x-2`
+    // separation rather than a literal middle-dot, so the joined-text
+    // helper walks down to the summary div whose flattened textContent
+    // matches the regex (default `getByText` can't match across two
+    // sibling text nodes).
     await user.click(screen.getByRole("button", { name: /life events/i }));
     expect(
-      screen.getByText(/Windfall .{1,3}50K in.+1 real estate investment/i)
+      getElementByJoinedText(
+        /Windfall .{1,3}50K in \d{4}1 real estate investment/i
+      )
     ).toBeInTheDocument();
   });
 });
@@ -1215,7 +1268,7 @@ describe("Real estate holdings", () => {
   // is now itself a sub-pill that mounts EXPANDED on +Add (newly-added
   // ID is tracked in PlannerForm's local set) and collapses to a single
   // summary line combining current value and annual rental income.
-  it("auto-expands a freshly-added holding and shows the value \u00b7 rent summary on collapse", async () => {
+  it("auto-expands a freshly-added holding and shows the value + rent summary on collapse", async () => {
     const user = userEvent.setup();
     render(<Host />);
     await expand(/real estate/i);
@@ -1229,7 +1282,8 @@ describe("Real estate holdings", () => {
     expect(within(card).queryByTestId("re-holding-card-0-summary")).toBeNull();
 
     // Fill in both a value and an annual rental income so the joined
-    // form of the summary ("value \u00b7 rent/yr") fires.
+    // form of the summary (value as the bold span + "rent/yr" as the
+    // soft label span) fires.
     const valueField = within(card).getByLabelText("Value") as HTMLInputElement;
     await user.clear(valueField);
     await user.type(valueField, "450000");
@@ -1247,9 +1301,11 @@ describe("Real estate holdings", () => {
     await user.click(within(card).getByRole("button", { name: /^Real Estate 1$/i }));
     expect(within(card).queryByLabelText("Value")).toBeNull();
     const summary = within(card).getByTestId("re-holding-card-0-summary");
+    // Post V2-C the value and label render as separate spans with
+    // `gap-x-2` visual separation (no literal " · " in the DOM), so
+    // textContent concatenates the two segments directly.
     expect(summary.textContent).toMatch(/450,000/);
     expect(summary.textContent).toMatch(/12,000 rent\/yr/);
-    expect(summary.textContent).toContain("\u00b7");
 
     // Re-expand to confirm the toggle round-trips and the fields return
     // with the values we typed in still preserved.
@@ -1284,13 +1340,14 @@ describe("Real estate holdings", () => {
     await expand(/real estate/i);
     const card = screen.getByTestId("re-holding-card-0");
     // Card is collapsed: inner fields hidden, summary present and
-    // showing the value-only form (no " \u00b7 rent/yr" suffix because
-    // annualRentalIncome is 0).
+    // showing the value-only form (no "rent/yr" label span because
+    // annualRentalIncome is 0). Post V2-C the value-only summary is
+    // a single bold-navy span with no label sibling, so textContent
+    // contains just the value text.
     expect(within(card).queryByLabelText("Value")).toBeNull();
     const summary = within(card).getByTestId("re-holding-card-0-summary");
     expect(summary.textContent).toMatch(/600,000/);
     expect(summary.textContent).not.toContain("rent/yr");
-    expect(summary.textContent).not.toContain("\u00b7");
   });
 });
 
@@ -1506,20 +1563,22 @@ describe("New debt events", () => {
       within(card).getByRole("button", { name: /^New Debt 1$/i })
     );
 
+    // Post V2-C the summary is one flex container with a value span +
+    // label span separated visually by `gap-x-2` (no literal " · " in
+    // the DOM), so we assert against the flattened textContent rather
+    // than against per-line <div>s.
     const summary = within(card).getByTestId("new-debt-card-0-summary");
-    // Two lines: headline div + schedule div.
-    const lines = Array.from(summary.querySelectorAll("div"));
-    expect(lines).toHaveLength(2);
-    // Line 1: headline. With default inflateAmount=true, principal=100K
+    // Headline (value): with default inflateAmount=true, principal=100K
     // and startYear = currentYear+5 at 2% inflation, the displayed
     // amount lands around €110,408. Assert the year format and a "11"
     // substring (matches "110,408" / "€110.4K" etc.) instead of "100"
     // so we lock in that the headline tracks the inflated value.
-    expect(lines[0]!.textContent).toMatch(/from \d{4}/);
-    expect(lines[0]!.textContent).toMatch(/11/);
-    expect(lines[0]!.textContent).not.toMatch(/100,000|100000/);
-    // Line 2: identical to the in-card schedule paragraph.
-    expect(lines[1]!.textContent).toBe(inCardSchedule);
+    expect(summary.textContent).toMatch(/from \d{4}/);
+    expect(summary.textContent).toMatch(/11/);
+    expect(summary.textContent).not.toMatch(/100,000|100000/);
+    // Label: identical to the in-card schedule paragraph (the schedule
+    // helper text is appended verbatim after the value span).
+    expect(summary.textContent).toContain(inCardSchedule);
   });
 
   it("collapsed New Debt headline drops back to the entered face value when 'Adjust amount for inflation' is unchecked", async () => {
@@ -1545,13 +1604,12 @@ describe("New debt events", () => {
     await user.click(
       within(card).getByRole("button", { name: /^New Debt 1$/i })
     );
+    // Post V2-C the summary flattens to a single string joined by
+    // SUMMARY_SEP; the headline now shows the raw entered amount
+    // (100,000) and never the inflated ~110K.
     const summary = within(card).getByTestId("new-debt-card-0-summary");
-    const lines = Array.from(summary.querySelectorAll("div"));
-    expect(lines).toHaveLength(2);
-    // Headline now shows the raw entered amount (100,000), not the
-    // inflated 110K.
-    expect(lines[0]!.textContent).toMatch(/100/);
-    expect(lines[0]!.textContent).not.toMatch(/110/);
+    expect(summary.textContent).toMatch(/100/);
+    expect(summary.textContent).not.toMatch(/110/);
   });
 });
 

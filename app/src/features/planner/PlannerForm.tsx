@@ -585,25 +585,24 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
             title="Debt"
             accent={ACCENT.debt}
             testId="subsection-debt"
-            // Two-line collapsed summary mirroring the New Debt life-event
-            // card: balance on top (no "from <year>" since the debt is
-            // already active), schedule helper line below using the same
-            // shared `formatDebtScheduleText` the in-card paragraph uses.
+            // Two-segment collapsed summary mirroring the New Debt life-
+            // event card: balance as the value (no "from <year>" since
+            // the debt is already active), schedule helper as the label,
+            // joined by SUMMARY_SEP so CollapsiblePill renders them as
+            // bold value + smaller soft label and wraps the schedule
+            // line to a second flex row when it overflows.
             summary={
-              <>
-                <div>{summarizeDebtSubsectionHeadline(value, format)}</div>
-                <div>
-                  {formatDebtScheduleText({
-                    principal: value.startDebt,
-                    interestRate: value.debtInterestRate,
-                    repaymentType: value.debtRepaymentType,
-                    startYear: currentYear,
-                    endYear: value.debtEndYear,
-                    format,
-                    messages: EXISTING_DEBT_SCHEDULE_MESSAGES
-                  })}
-                </div>
-              </>
+              summarizeDebtSubsectionHeadline(value, format) +
+              SUMMARY_SEP +
+              formatDebtScheduleText({
+                principal: value.startDebt,
+                interestRate: value.debtInterestRate,
+                repaymentType: value.debtRepaymentType,
+                startYear: currentYear,
+                endYear: value.debtEndYear,
+                format,
+                messages: EXISTING_DEBT_SCHEDULE_MESSAGES
+              })
             }
           >
             {renderAmounts(DEBT_AMOUNTS)}
@@ -812,6 +811,26 @@ export function PlannerForm({ value, onChange, onReset }: Props) {
   );
 }
 
+// Middle-dot separator used between value and label in every collapsed
+// pill summary string. Keeping it as a module-level constant lets the
+// summary helpers, the Debt + New Debt multi-segment summaries, and the
+// CollapsiblePill renderer all agree on the exact same character.
+const SUMMARY_SEP = " \u00b7 "; // " · "
+
+// Splits a summary string into its leading value (before the first
+// middle-dot) and its trailing label (everything after). Splitting on
+// the FIRST occurrence only is intentional: the Debt In Fine schedule
+// line itself contains a " · " (`Annual interest payment: €X · Lump sum
+// of €Y in 2030.`), and we want that inner dot preserved inside the
+// label rather than splitting on it. Single-segment summaries (`$540K`,
+// `—`, `Inflation 2.5%`) come back with `label === null` so the
+// renderer skips the label span entirely.
+function splitSummary(s: string): { value: string; label: string | null } {
+  const i = s.indexOf(SUMMARY_SEP);
+  if (i === -1) return { value: s, label: null };
+  return { value: s.slice(0, i), label: s.slice(i + SUMMARY_SEP.length) };
+}
+
 // Shared collapsible-pill primitive used by both the top-level category
 // pills (size="lg", e.g. Assets & Debt) and the inner sub-pills
 // (size="sm", e.g. Liquid / Non-Liquid / life-event cards). Visual
@@ -873,14 +892,15 @@ function CollapsiblePill({
     ? "flex items-center gap-2.5 text-left text-sm font-semibold"
     : "flex items-center gap-1.5";
 
-  // Both sizes share the same summary class so collapsed child pills
-  // read at the same weight as collapsed parent categories. `block`
-  // (no flex) lets multi-line ReactNode summaries (e.g. New Debt's
-  // headline + schedule line) stack vertically; single-string summaries
-  // render unchanged. `text-center` horizontally centers the summary in
-  // the pill body so it doesn't crowd the top-left legend corner.
-  const summaryClass =
-    "pt-1 text-center text-base font-medium tabular-nums text-[var(--ink-muted)]";
+  // V2-C size hierarchy: bold 16px navy value + 13px soft-slate label,
+  // baseline-aligned and left-justified in a flex row. Long labels
+  // (e.g. the Debt In Fine schedule) wrap to a new flex row via
+  // `flex-wrap` rather than crowding the value. Replaces the previous
+  // single-tone `--ink-muted` summary that read as placeholder text.
+  // The wrapper class is shared across pill sizes so collapsed sub-
+  // pills and parent categories carry the same typographic hierarchy.
+  const summaryWrapperClass =
+    "pt-1 text-left flex flex-wrap items-baseline gap-x-2 gap-y-0.5";
 
   return (
     <fieldset
@@ -943,9 +963,25 @@ function CollapsiblePill({
       ) : summary ? (
         <div
           data-testid={testId ? `${testId}-summary` : undefined}
-          className={summaryClass}
+          className={summaryWrapperClass}
         >
-          {summary}
+          {typeof summary === "string"
+            ? (() => {
+                const { value, label } = splitSummary(summary);
+                return (
+                  <>
+                    <span className="text-[16px] font-bold tabular-nums text-[var(--ink)]">
+                      {value}
+                    </span>
+                    {label ? (
+                      <span className="text-[13px] tabular-nums text-[var(--ink-soft)]">
+                        {label}
+                      </span>
+                    ) : null}
+                  </>
+                );
+              })()
+            : summary}
         </div>
       ) : null}
     </fieldset>
@@ -1338,14 +1374,15 @@ function NewDebtEventCard({
       accent={accent}
       defaultOpen={defaultOpen}
       testId={`new-debt-card-${index}`}
-      // Two-line collapsed summary: headline (principal + start year)
-      // on top, schedule helper (same text the in-card paragraph shows)
-      // below, so the user can scan both at a glance without expanding.
+      // Two-segment collapsed summary: headline (principal + start year)
+      // as the value, schedule helper (same text the in-card paragraph
+      // shows) as the label, joined by SUMMARY_SEP. CollapsiblePill
+      // renders them as bold value + smaller soft label and wraps the
+      // schedule line to a second flex row when it overflows.
       summary={
-        <>
-          <div>{summarizeNewDebtCard(event, inflatedPrincipal, format)}</div>
-          <div>{formatNewDebtScheduleText(event, inflatedPrincipal, format)}</div>
-        </>
+        summarizeNewDebtCard(event, inflatedPrincipal, format) +
+        SUMMARY_SEP +
+        formatNewDebtScheduleText(event, inflatedPrincipal, format)
       }
     >
       <CurrencyField
