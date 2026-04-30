@@ -26,6 +26,11 @@ export function SiteFooter() {
                   How it works
                 </a>
               </li>
+              <li>
+                <a href="/landing" className="hover:text-[var(--navy)]">
+                  Landing preview
+                </a>
+              </li>
             </ul>
           </div>
           <div>
