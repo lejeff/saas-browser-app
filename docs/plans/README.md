@@ -5,7 +5,7 @@ Filenames are prefixed with the date the plan was created.
 
 > For the current roadmap of upcoming work, see [`ROADMAP.md`](../../ROADMAP.md) at the repo root.
 
-**33 plans** across 7 days.
+**34 plans** across 7 days.
 
 ## 2026-04-22
 
@@ -60,3 +60,4 @@ Filenames are prefixed with the date the plan was created.
 ## 2026-04-30
 
 - [Dual-handle range slider for New Debt loan period](./2026-04-30-new-debt-range-slider.md) — Replace the two single-handle Start year + Loan end year sliders on the New Debt life-event card with one dual-thumb range slider built on `@radix-ui/react-slider`. Two helper lines below the slider preserve the existing principal preview, relative-year text, and inFine label swap. Radix enforces `start <= end` natively; schema in `@app/core` is unchanged so legacy data still loads. First third-party UI primitive in the codebase.
+- [Fold landing into main](./2026-04-30-fold-landing-into-main.md) — Fold the v0 marketing landing into `main` as a hidden, `robots: noindex` preview at `/landing`, leaving the planner untouched at `/`. Per-route chrome is achieved by moving `SiteHeader`/`SiteFooter` out of the root layout into `app/page.tsx`, while the new `/landing` route mounts its own `LandingHeader`/`LandingFooter`. Adds a discreet "Landing preview" link in `SiteFooter`. The `landing-page-mockup` branch (and v0 sandbox worktree) is retired after the fold.
