@@ -3,6 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { CurrencyField } from "./CurrencyField";
 import { FramedField } from "./FramedField";
+import { RangeSliderRow } from "./RangeSlider";
 import { useCurrency } from "@/features/currency/CurrencyContext";
 import {
   DEBT_REPAYMENT_TYPES,
@@ -1320,25 +1321,16 @@ function NewDebtEventCard({
     format: percent
   };
 
-  const startYearSpec: SliderSpec = {
-    key: "newDebtStartYear",
-    label: "Start year",
+  const loanPeriodSpec: SliderSpec = {
+    key: "newDebtLoanPeriod",
+    label: "Loan period",
     min: yearMin,
     max: yearMax,
     step: 1,
     format: rawYear
   };
-
-  const endYearLabel =
+  const endYearAriaLabel =
     event.repaymentType === "inFine" ? "Lump sum repayment year" : "Loan end year";
-  const endYearSpec: SliderSpec = {
-    key: "newDebtEndYear",
-    label: endYearLabel,
-    min: yearMin,
-    max: yearMax,
-    step: 1,
-    format: rawYear
-  };
 
   return (
     <CollapsibleSubsection
@@ -1391,27 +1383,28 @@ function NewDebtEventCard({
           ))}
         </select>
       </FramedField>
-      <SliderRow
-        spec={startYearSpec}
-        value={event.startYear}
-        onChange={(next) => onChange({ startYear: next })}
-        helper={
+      <RangeSliderRow
+        spec={loanPeriodSpec}
+        value={[event.startYear, event.endYear]}
+        onChange={([start, end]) => onChange({ startYear: start, endYear: end })}
+        thumbAriaLabels={[
+          `Start year for new debt ${index + 1}`,
+          `${endYearAriaLabel} for new debt ${index + 1}`
+        ]}
+        helpers={[
           // Always pair the amount the engine actually deposits into
-          // liquid with the relative timing, e.g. "€220K in 3 years".
+          // liquid with the relative timing, e.g. "Start: €220K in 3 years".
           // When `inflateAmount` is on we use the inflated nominal
           // disbursement; when off we use the entered face value. On a
           // fresh blank-slate card (principal === 0) we drop back to just
           // the relative phrase so the helper doesn't read "€0 in 3 years".
           event.principal > 0
-            ? `${format(inflatedPrincipal)} ${yearsFromNow(event.startYear, currentYear)}`
-            : yearsFromNow(event.startYear, currentYear)
-        }
-      />
-      <SliderRow
-        spec={endYearSpec}
-        value={event.endYear}
-        onChange={(next) => onChange({ endYear: next })}
-        helper={yearsFromNow(event.endYear, currentYear)}
+            ? `Start: ${format(inflatedPrincipal)} ${yearsFromNow(event.startYear, currentYear)}`
+            : `Start: ${yearsFromNow(event.startYear, currentYear)}`,
+          // The end-line label echoes the existing dynamic "Loan end year" /
+          // "Lump sum repayment year" swap from the legacy two-slider design.
+          `${event.repaymentType === "inFine" ? "Lump sum repayment" : "End"}: ${yearsFromNow(event.endYear, currentYear)}`
+        ]}
       />
       <NewDebtScheduleSummary
         event={event}
