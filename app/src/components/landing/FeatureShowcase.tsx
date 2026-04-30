@@ -142,54 +142,114 @@ function PlanWithNuanceVisual() {
 }
 
 function VisualizeVisual() {
+  // Donut gauge geometry
+  const r = 72;
+  const cx = 100;
+  const cy = 100;
+  const circumference = 2 * Math.PI * r;
+  const successPct = 0.91;
+  const arcLen = circumference * successPct;
+
+  // Outcome distribution bars (P10 / P50 / P90 of net worth at age 65)
+  const outcomes = [
+    { label: "Worst case (P10)", value: "$890K", width: 38, tone: "muted" as const },
+    { label: "Median (P50)", value: "$2.4M", width: 70, tone: "teal" as const },
+    { label: "Best case (P90)", value: "$4.2M", width: 100, tone: "soft" as const }
+  ];
+
   return (
     <div className="card p-6 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="eyebrow">Net Worth Over Time</div>
-        <div className="flex gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[var(--teal)]" />
-            <span className="text-[var(--ink-muted)]">Assets</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[var(--coral)]" />
-            <span className="text-[var(--ink-muted)]">Debt</span>
-          </div>
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-y-2">
+        <div className="eyebrow">Plan Confidence</div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--ink-muted)]">Monte Carlo · 10,000 runs</span>
+          <span className="inline-flex items-center rounded-full bg-[var(--coral)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--coral)]">
+            Preview
+          </span>
         </div>
       </div>
-      <div className="h-56 flex items-end gap-1.5 px-2 pb-4 border-b border-l border-[var(--border)]">
-        {[25, 30, 28, 35, 45, 50, 48, 55, 65, 70, 68, 75, 85, 90, 95].map((height, i) => (
-          <div key={i} className="flex-1 flex flex-col justify-end gap-0.5">
-            <div 
-              className="rounded-t-sm bg-[var(--teal)] transition-all duration-300 hover:bg-[var(--teal-soft)]" 
-              style={{ height: `${height}%` }} 
-            />
-            {i < 5 && (
-              <div 
-                className="rounded-b-sm bg-[var(--coral)]/70" 
-                style={{ height: `${(100 - height) * 0.2}%` }} 
+
+      {/* Hero metric: radial gauge */}
+      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] items-center gap-6">
+        <div className="mx-auto sm:mx-0 flex flex-col items-center">
+          <div className="relative w-[200px] h-[200px]">
+            <svg viewBox="0 0 200 200" className="w-full h-full" aria-hidden>
+              {/* Track */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke="var(--border)"
+                strokeWidth="14"
               />
-            )}
+              {/* Foreground arc */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke="var(--teal)"
+                strokeWidth="14"
+                strokeLinecap="round"
+                strokeDasharray={`${arcLen} ${circumference - arcLen}`}
+                strokeDashoffset={0}
+                transform={`rotate(-90 ${cx} ${cy})`}
+              />
+            </svg>
+            {/* Centered percentage only — label moves outside the gauge */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="font-display text-5xl font-semibold leading-none text-[var(--navy)]">
+                91<span className="text-3xl text-[var(--ink-muted)]">%</span>
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="flex justify-between mt-3 text-xs text-[var(--ink-muted)]">
-        <span>Today</span>
-        <span>Retirement</span>
-      </div>
-      
-      <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-        <div className="p-3 rounded-lg bg-[var(--cream)]">
-          <div className="text-2xl font-semibold text-[var(--navy)]">$2.4M</div>
-          <div className="text-xs text-[var(--ink-muted)] mt-1">Projected Peak</div>
+          <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)] text-center">
+            Probability of success
+          </div>
         </div>
-        <div className="p-3 rounded-lg bg-[var(--cream)]">
-          <div className="text-2xl font-semibold text-[var(--teal)]">Age 57</div>
-          <div className="text-xs text-[var(--ink-muted)] mt-1">FI Target</div>
+
+        {/* Outcome distribution */}
+        <div className="space-y-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+            Net worth at age 65
+          </div>
+          {outcomes.map((o) => (
+            <div key={o.label}>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-[var(--ink-muted)]">{o.label}</span>
+                <span className="font-semibold text-[var(--navy)] tabular-nums">{o.value}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--cream)] border border-[var(--border)] overflow-hidden">
+                <div
+                  className={
+                    o.tone === "teal"
+                      ? "h-full bg-[var(--teal)]"
+                      : o.tone === "soft"
+                        ? "h-full bg-[var(--teal)]/40"
+                        : "h-full bg-[var(--ink-muted)]/30"
+                  }
+                  style={{ width: `${o.width}%` }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="p-3 rounded-lg bg-[var(--cream)]">
-          <div className="text-2xl font-semibold text-[var(--coral)]">91%</div>
-          <div className="text-xs text-[var(--ink-muted)] mt-1">Success Rate</div>
+      </div>
+
+      {/* Supporting metrics */}
+      <div className="mt-6 grid grid-cols-3 gap-4 text-center border-t border-[var(--border)] pt-5">
+        <div>
+          <div className="text-xl font-semibold text-[var(--navy)]">Age 57</div>
+          <div className="text-xs text-[var(--ink-muted)] mt-1">FI target</div>
+        </div>
+        <div>
+          <div className="text-xl font-semibold text-[var(--teal)]">$2.4M</div>
+          <div className="text-xs text-[var(--ink-muted)] mt-1">Median peak</div>
+        </div>
+        <div>
+          <div className="text-xl font-semibold text-[var(--coral)]">3.4%</div>
+          <div className="text-xs text-[var(--ink-muted)] mt-1">Safe withdrawal</div>
         </div>
       </div>
     </div>
