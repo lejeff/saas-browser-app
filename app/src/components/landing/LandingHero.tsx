@@ -108,12 +108,19 @@ export function LandingHero() {
 
               {/* App preview content */}
               <div className="p-6 md:p-8 bg-[var(--surface)]">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Left column — 2×2 grid of compact section pills,
-                      each mirroring one section of the real planner.
-                      `auto-rows-fr` keeps both rows the same height so
-                      the four cells read as a uniform tile grid. */}
-                  <div className="grid grid-cols-2 gap-3 auto-rows-fr">
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {/* Left column — compact section pills, each
+                      mirroring one section of the real planner.
+                      Stacks 1-column on every viewport below `lg:`
+                      (<1024px) — at smaller widths the chart card
+                      drops below the mocks anyway (outer grid is
+                      stacked), so 1-col mocks read as a clean
+                      vertical list rather than a cramped 2x2 that
+                      truncates values. At `lg:` and up, outer flips
+                      to mocks-left + chart-right and inner snaps to
+                      a 2x2 with `auto-rows-fr` keeping both rows the
+                      same height. */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 auto-rows-fr">
                     <MockAssetsDebt />
                     <MockRealEstate />
                     <MockIncomeExpenses />
